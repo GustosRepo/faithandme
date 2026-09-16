@@ -23,7 +23,7 @@ iOS Simulator can generally reach the Mac host with `http://localhost:3000`. Phy
 
 ## Railway Deployment
 
-1. Create a Railway service from this repo and set the service root to `server`.
+1. Create a Railway service from this repo. The root `railway.json` tells Railway to build and start the API from `server/`.
 2. Set `OPENAI_API_KEY` in Railway variables.
 3. Deploy the service.
 4. Open the Railway-generated public domain and verify `/health`.
