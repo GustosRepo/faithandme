@@ -33,7 +33,7 @@
 - [x] Development-only reset actions added for the daily moment and streak in __DEV__
 - [x] TypeScript validation passes for the daily-session engine changes
 - [x] Expo startup smoke test launched successfully
-- [ ] Full interactive simulator walkthrough of the completed five-stage session and streak behavior remains to be validated in a live iOS environment
+- [x] Full interactive simulator walkthrough of the completed five-stage session and streak behavior validated in a live iOS environment
 
 ## Phase 4A status
 
@@ -47,7 +47,26 @@
 - [x] Translation onboarding removed; old stored values are ignored safely
 - [x] Offline Bible book, chapter, and reader foundation added
 - [x] Continue Reading persists the last opened book and chapter
-- [ ] Full interactive Bible reader and daily-session walkthrough remains to be validated in a live iOS environment
+- [x] Full interactive Bible reader and daily-session walkthrough validated in a live iOS environment
+
+## Phase 5A status
+
+- [x] Ask Scripture mobile service boundary added with centralized API configuration
+- [x] Deterministic local topic-to-Scripture retrieval added using canonical BSB references only
+- [x] Curated Ask Scripture references validated against the bundled local BSB corpus
+- [x] Ask screen composer, loading, error, and structured editorial response UI implemented
+- [x] Mobile resolves displayed Scripture text locally from ScriptureService
+- [x] Railway-ready Express/TypeScript server added under server/
+- [x] POST /api/ask-scripture request validation, size limits, and trust-boundary checks implemented
+- [x] Server-side OpenAI Responses API integration isolated behind configuration
+- [x] Structured model response validation restricts returned Scripture references to supplied references
+- [x] Basic server-side safety classification added for immediate-danger scenarios
+- [x] Basic IP rate limiting added and smoke-tested locally
+- [x] GET /health endpoint added and verified locally
+- [x] server/.env.example and deployment notes added
+- [x] Server TypeScript build and focused validation tests pass
+- [x] Live OpenAI response validation completed with server-loaded OPENAI_API_KEY
+- [ ] Railway deployment validation pending deployed API URL
 
 ## Notes
 
