@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Chip, ProgressBar, Screen, ScriptureCard, Text } from '@/components/ui';
+import { BrandMark } from '@/components/BrandMark';
+import { Button, EditorialLabel, ProgressBar, Screen, Text } from '@/components/ui';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { useDailySession } from '@/hooks/useDailySession';
@@ -62,36 +63,61 @@ export default function TodayScreen() {
   };
 
   return (
-    <Screen contentContainerStyle={[styles.container, { paddingTop: 28 }]}>
+    <Screen contentContainerStyle={[styles.container, { paddingTop: 26 }]}>
+      <BrandMark size="small" />
       {contextText ? (
         <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
           {contextText}
         </Text>
       ) : null}
-      <Text variant="display" style={styles.heading}>
-        What do you need today?
+      <Text variant="body" style={{ color: theme.colors.textSecondary }}>
+        Good morning.
+      </Text>
+      <Text variant="displaySerif" style={styles.heading}>
+        What do you need{'\n'}today?
       </Text>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
+      <View style={styles.needList}>
         {topics.map((topic, index) => (
-          <Chip key={topic} label={topic} selected={index === 0} />
+          <View
+            key={topic}
+            style={styles.needItem}
+          >
+            <Text variant="caption" style={{ color: index === 0 ? theme.colors.accent : theme.colors.textMuted }}>
+              {String(index + 1).padStart(2, '0')}
+            </Text>
+            <Text
+              variant="body"
+              style={[
+                styles.needText,
+                { color: index === 0 ? theme.colors.accent : theme.colors.textSecondary },
+              ]}
+            >
+              {topic}
+            </Text>
+          </View>
         ))}
-      </ScrollView>
+      </View>
 
-      <ScriptureCard title={selectedSession.theme} reference={scripture?.displayReference ?? selectedSession.scriptureReference} text={scripture?.text ?? 'Scripture is unavailable.'} translation="BSB" />
+      <View style={[styles.scriptureFeature, { borderColor: theme.colors.rule }]}>
+        <EditorialLabel>Daily Scripture</EditorialLabel>
+        <Text variant="bodySmall" style={{ color: theme.colors.accent }}>{selectedSession.theme}</Text>
+        <Text variant="scripture" style={styles.scriptureText}>
+          {scripture?.text ?? 'Scripture is unavailable.'}
+        </Text>
+        <Text variant="scriptureReference" style={{ color: theme.colors.textSecondary }}>
+          {scripture?.displayReference ?? selectedSession.scriptureReference} · BSB
+        </Text>
+      </View>
 
       <View style={styles.sectionHeaderRow}>
-        <Text variant="subheading">Your 5 Minutes With God</Text>
+        <EditorialLabel>Your 5 Minutes With God</EditorialLabel>
         <Text variant="caption" style={{ color: theme.colors.textMuted }}>
           {completedCount} of 5
         </Text>
       </View>
 
-      <Card style={styles.sessionCard}>
+      <View style={styles.sessionBlock}>
         <ProgressBar progress={progressValue} />
 
         <View style={styles.stepGrid}>
@@ -112,7 +138,7 @@ export default function TodayScreen() {
             </View>
           ))}
         </View>
-      </Card>
+      </View>
 
       <View style={styles.streakRow}>
         <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
@@ -128,15 +154,40 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    gap: 14,
+    gap: 16,
   },
   heading: {
-    marginTop: 8,
-    maxWidth: 280,
+    marginTop: -2,
+    maxWidth: 330,
   },
-  chipRow: {
-    paddingVertical: 10,
-    paddingRight: 12,
+  needList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 18,
+    rowGap: 10,
+    paddingTop: 4,
+    paddingBottom: 6,
+  },
+  needItem: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  needText: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'transparent',
+  },
+  scriptureFeature: {
+    gap: 13,
+    marginTop: 8,
+    paddingVertical: 22,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  scriptureText: {
+    fontSize: 31,
+    lineHeight: 44,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -144,7 +195,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
   },
-  sessionCard: {
+  sessionBlock: {
     marginTop: 4,
     paddingVertical: 16,
     gap: 18,

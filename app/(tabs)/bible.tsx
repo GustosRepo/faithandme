@@ -1,31 +1,94 @@
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, SectionHeader, Text } from '@/components/ui';
+import { Button, Divider, EditorialLabel, ProgressBar, Screen, Text } from '@/components/ui';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { scriptureService } from '@/services/scripture/ScriptureService';
-import { loadBibleReadingPosition } from '@/storage/bibleReading';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { defaultBibleActivityState, loadBibleActivityState, type BibleActivityState } from '@/storage/bibleActivity';
 
 export default function BibleScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const books = scriptureService.getBooks();
-  const [lastRead, setLastRead] = useState<{ bookId: string; chapter: number } | null>(null);
+  const [activity, setActivity] = useState<BibleActivityState>(defaultBibleActivityState);
 
-  useEffect(() => { void loadBibleReadingPosition().then(setLastRead); }, []);
+  useFocusEffect(
+    useCallback(() => {
+      void loadBibleActivityState().then(setActivity);
+    }, []),
+  );
+
+  const lastRead = activity.lastPosition;
   const lastBook = lastRead ? scriptureService.getBook(lastRead.bookId) : undefined;
+  const completedCount = Object.values(activity.completedChapters).reduce((total, chapters) => total + chapters.length, 0);
+  const savedCount = Object.keys(activity.bookmarks).length;
+  const highlightCount = Object.keys(activity.highlights).length;
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="display">Bible</Text>
+      <EditorialLabel>Bible</EditorialLabel>
+      <Text variant="displaySerif">Berean Standard Bible</Text>
       <Text variant="body" style={{ color: theme.colors.textSecondary }}>Berean Standard Bible · BSB</Text>
 
-      <SectionHeader title="Continue Reading" />
-      {lastBook && lastRead ? <Card style={styles.continueCard}><View><Text variant="subheading">{lastBook.name}</Text><Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>Chapter {lastRead.chapter}</Text></View><Button title="Continue" onPress={() => router.push({ pathname: '/bible/[bookId]/[chapter]', params: { bookId: lastBook.id, chapter: String(lastRead.chapter) } })} /></Card> : <Text variant="body" style={{ color: theme.colors.textMuted }}>Open a chapter to begin reading.</Text>}
+      <View style={styles.section}>
+        <EditorialLabel>Continue Reading</EditorialLabel>
+        {lastBook && lastRead ? (
+          <View style={[styles.continueBlock, { borderColor: theme.colors.rule }]}>
+            <View>
+              <Text variant="headingSerif">{lastBook.name}</Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>
+                Chapter {lastRead.chapter}{lastRead.verse ? `:${lastRead.verse}` : ''}
+              </Text>
+            </View>
+            <Button title="Continue" onPress={() => router.push({ pathname: '/bible/[bookId]/[chapter]', params: { bookId: lastBook.id, chapter: String(lastRead.chapter) } })} />
+          </View>
+        ) : (
+          <Text variant="body" style={{ color: theme.colors.textMuted }}>Open a chapter to begin reading.</Text>
+        )}
+      </View>
 
-      <SectionHeader title="Browse the Bible" />
-      {(['OT', 'NT'] as const).map((testament) => <View key={testament} style={styles.group}><Text variant="subheading">{testament === 'OT' ? 'Old Testament' : 'New Testament'}</Text>{books.filter((book) => book.testament === testament).map((book) => <Pressable key={book.id} onPress={() => router.push({ pathname: '/bible/[bookId]', params: { bookId: book.id } })} style={styles.readingRow}><Text variant="body">{book.name}</Text><Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>{book.chapterCount} chapters</Text></Pressable>)}</View>)}
+      <View style={[styles.statsBlock, { borderColor: theme.colors.rule }]}>
+        <View style={styles.statItem}>
+          <Text variant="headingSerif">{completedCount}</Text>
+          <Text variant="caption" style={{ color: theme.colors.textMuted }}>Chapters Read</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text variant="headingSerif">{savedCount}</Text>
+          <Text variant="caption" style={{ color: theme.colors.textMuted }}>Bookmarks</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text variant="headingSerif">{highlightCount}</Text>
+          <Text variant="caption" style={{ color: theme.colors.textMuted }}>Highlights</Text>
+        </View>
+      </View>
+      <Button title="Saved & Highlights" variant="secondary" onPress={() => router.push('/bible/saved')} />
+
+      <Divider />
+      {(['OT', 'NT'] as const).map((testament) => (
+        <View key={testament} style={styles.group}>
+          <EditorialLabel>{testament === 'OT' ? 'Old Testament' : 'New Testament'}</EditorialLabel>
+          {books.filter((book) => book.testament === testament).map((book) => {
+            const chaptersRead = activity.completedChapters[book.id]?.length ?? 0;
+            const progress = chaptersRead / book.chapterCount;
+            return (
+              <Pressable
+                key={book.id}
+                onPress={() => router.push({ pathname: '/bible/[bookId]', params: { bookId: book.id } })}
+                style={[styles.readingRow, { borderBottomColor: theme.colors.rule }]}
+              >
+                <View style={styles.rowHeader}>
+                  <Text variant="body">{book.name}</Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>
+                    {chaptersRead}/{book.chapterCount}
+                  </Text>
+                </View>
+                <ProgressBar progress={progress} />
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
       <Text variant="caption" style={{ color: theme.colors.textMuted }}>The Berean Standard Bible is dedicated to the public domain and bundled for offline reading.</Text>
     </Screen>
   );
@@ -33,14 +96,38 @@ export default function BibleScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    gap: 12,
+    gap: 14,
   },
-  group: { gap: 2, marginBottom: 14 },
-  continueCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  readingRow: {
-    gap: 2,
-    paddingVertical: 8,
+  section: { gap: 12, marginTop: 12 },
+  statsBlock: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#D9CDB7',
+  },
+  statItem: {
+    flex: 1,
+    gap: 3,
+  },
+  group: { gap: 2, marginBottom: 18 },
+  continueBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 16,
+  },
+  readingRow: {
+    gap: 8,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  rowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
   },
 });

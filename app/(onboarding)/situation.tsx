@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Chip, Screen, Text } from '@/components/ui';
+import { Button, Card, Chip, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useOnboarding } from '@/context/OnboardingContext';
 
 const situations = [
@@ -27,8 +27,8 @@ export default function SituationScreen() {
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="caption" style={styles.kicker}>Step 2 of 6</Text>
-      <Text variant="display">What are you going through?</Text>
+      <EditorialLabel>Step 2 of 6</EditorialLabel>
+      <Text variant="displaySerif">What are you going through?</Text>
       <Text variant="body" style={styles.subtleText}>You can choose more than one.</Text>
 
       <Card style={styles.optionCard}>
@@ -60,10 +60,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'space-between',
     gap: 18,
-  },
-  kicker: {
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
   },
   subtleText: {
     maxWidth: 320,

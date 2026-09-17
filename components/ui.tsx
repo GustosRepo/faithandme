@@ -4,11 +4,14 @@ import type { PressableProps, ScrollViewProps, StyleProp, TextStyle, ViewStyle }
 import { Platform, Pressable, Text as RNText, View as RNView, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FaithBackground } from '@/components/FaithBackground';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
 export type TextVariant =
   | 'display'
+  | 'displaySerif'
   | 'heading'
+  | 'headingSerif'
   | 'subheading'
   | 'body'
   | 'bodySmall'
@@ -20,17 +23,20 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
 type ScreenProps = {
   children: ReactNode;
+  background?: 'faith' | 'plain';
   contentContainerStyle?: StyleProp<ViewStyle>;
   scrollEnabled?: boolean;
   scrollProps?: Partial<ScrollViewProps>;
 };
 
-export function Screen({ children, contentContainerStyle, scrollEnabled = true, scrollProps }: ScreenProps) {
+export function Screen({ children, background = 'faith', contentContainerStyle, scrollEnabled = true, scrollProps }: ScreenProps) {
   const theme = useAppTheme();
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.colors.background }]} edges={['top', 'bottom']}>
+      {background === 'faith' ? <FaithBackground /> : null}
       <ScrollView
+        style={styles.scroll}
         scrollEnabled={scrollEnabled}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.content, contentContainerStyle]}
@@ -76,7 +82,17 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
 
 export function Divider() {
   const theme = useAppTheme();
-  return <RNView style={[styles.divider, { backgroundColor: theme.colors.border }]} />;
+  return <RNView style={[styles.divider, { backgroundColor: theme.colors.rule }]} />;
+}
+
+export function EditorialLabel({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
+  const theme = useAppTheme();
+
+  return (
+    <Text variant="caption" style={[styles.editorialLabel, { color: theme.colors.textMuted }, style]}>
+      {children}
+    </Text>
+  );
 }
 
 export function SectionHeader({
@@ -90,7 +106,7 @@ export function SectionHeader({
 
   return (
     <RNView style={styles.sectionHeaderRow}>
-      <Text variant="subheading">{title}</Text>
+      <EditorialLabel>{title}</EditorialLabel>
       {secondary ? (
         <Text variant="caption" style={{ color: theme.colors.textMuted }}>
           {secondary}
@@ -118,8 +134,8 @@ export function Chip({
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? theme.colors.accentSoft : theme.colors.surfaceSecondary,
-          borderColor: selected ? theme.colors.accent : theme.colors.border,
+          backgroundColor: selected ? theme.colors.accentSoft : 'transparent',
+          borderColor: selected ? theme.colors.accent : theme.colors.rule,
           opacity: pressed ? 0.9 : 1,
         },
       ]}
@@ -204,7 +220,7 @@ export function Button({
       textColor: theme.colors.surface,
     },
     secondary: {
-      backgroundColor: theme.colors.surfaceSecondary,
+      backgroundColor: 'transparent',
       borderColor: theme.colors.border,
       textColor: theme.colors.text,
     },
@@ -222,6 +238,7 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        variant === 'ghost' ? styles.buttonGhost : null,
         {
           backgroundColor: variantStyles[variant].backgroundColor,
           borderColor: variantStyles[variant].borderColor,
@@ -250,11 +267,9 @@ export function ScriptureCard({
   const theme = useAppTheme();
 
   return (
-    <Card style={styles.scriptureCard}>
+    <RNView style={[styles.scriptureCard, { borderColor: theme.colors.rule }]}>
       <RNView style={styles.scriptureHeader}>
-        <Text variant="caption" style={{ color: theme.colors.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
-          Daily Scripture
-        </Text>
+        <EditorialLabel>Daily Scripture</EditorialLabel>
         <RNView style={styles.scriptureActions}>
           <IconButton name="bookmark-outline" accessibilityLabel="Save verse" onPress={() => undefined} />
           <IconButton name="share-social-outline" accessibilityLabel="Share verse" onPress={() => undefined} />
@@ -274,29 +289,40 @@ export function ScriptureCard({
       <Text variant="scriptureReference" style={{ color: theme.colors.textSecondary }}>
         {reference ?? 'Joshua 1:9'}{translation ? ` · ${translation}` : ''}
       </Text>
-    </Card>
+    </RNView>
   );
 }
 
 const stylesText: Record<TextVariant, TextStyle> = {
   display: { fontSize: 34, lineHeight: 40, fontWeight: '700' },
+  displaySerif: {
+    fontSize: 40,
+    lineHeight: 47,
+    fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', web: 'Georgia' }),
+  },
   heading: { fontSize: 26, lineHeight: 32, fontWeight: '700' },
+  headingSerif: {
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '400',
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', web: 'Georgia' }),
+  },
   subheading: { fontSize: 18, lineHeight: 24, fontWeight: '600' },
   body: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
   bodySmall: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
   caption: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
   scripture: {
-    fontSize: 27,
-    lineHeight: 38,
+    fontSize: 28,
+    lineHeight: 40,
     fontWeight: '400',
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', web: 'Georgia' }),
-    letterSpacing: -0.3,
   },
   scriptureReference: {
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '600',
-    letterSpacing: 0.4,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
 };
@@ -304,14 +330,19 @@ const stylesText: Record<TextVariant, TextStyle> = {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    overflow: 'hidden',
+  },
+  scroll: {
+    position: 'relative',
+    zIndex: 1,
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 14,
     paddingBottom: 40,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     padding: 16,
     gap: 12,
@@ -319,7 +350,11 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     width: '100%',
-    marginVertical: 12,
+    marginVertical: 14,
+  },
+  editorialLabel: {
+    letterSpacing: 1.35,
+    textTransform: 'uppercase',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -329,31 +364,39 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   chip: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     borderWidth: 1,
     marginRight: 10,
   },
   button: {
-    borderRadius: 14,
+    minHeight: 46,
+    borderRadius: 10,
     borderWidth: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  buttonGhost: {
+    minHeight: 40,
+    paddingVertical: 8,
+  },
   iconButton: {
     width: 34,
     height: 34,
-    borderRadius: 12,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scriptureCard: {
-    marginTop: 18,
-    marginBottom: 20,
+    marginTop: 24,
+    marginBottom: 26,
     paddingVertical: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
   scriptureHeader: {
     flexDirection: 'row',

@@ -66,3 +66,16 @@ PostgreSQL stores only usage counters: bucket type, bucket key, UTC date, counts
 No auth, user accounts, embeddings, RevenueCat, queues, or subscriptions are used in Phase 5A.1.
 
 Phase 5A.2 keeps the free anonymous limit at `FREE_ASKS_PER_DAY` and the same IP/global caps. Future paid tiers can raise the per-install limit after purchase validation, but server-side abuse and spend caps should remain in place for every tier.
+
+## Production Validation
+
+The current production baseline is:
+
+- Node 22 runtime through Railway/Nixpacks
+- Railway PostgreSQL connected through `DATABASE_URL`
+- `OPENAI_MODEL=gpt-5.6-luna`
+- `OPENAI_REASONING_EFFORT=low`
+- `/health` returns `200`
+- `POST /api/ask-scripture` returns `200` with anonymous usage data when the OpenAI project has access to `gpt-5.6-luna`
+
+Successful Ask logs should include `requestId`, `endpoint`, `status`, `latencyMs`, `model`, `reasoningEffort`, and `tokenUsage`.

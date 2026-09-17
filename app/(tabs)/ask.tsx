@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { Button, Card, Chip, Divider, Screen, Text } from '@/components/ui';
+import { BrandMark } from '@/components/BrandMark';
+import { Button, Chip, Divider, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { askScripture, getAskScriptureUsage } from '@/services/ask/AskScriptureService';
 import { getAskTopicLabels } from '@/services/ask/scriptureRetrieval';
-import type { AskScriptureResult, AskScriptureUsage } from '@/services/ask/types';
+import type { AskScriptureErrorCode, AskScriptureResult, AskScriptureUsage } from '@/services/ask/types';
 import { AskScriptureError } from '@/services/ask/types';
+
+const MAX_QUESTION_LENGTH = 800;
 
 const suggestedQuestions: Record<string, string> = {
   Anxiety: "I'm anxious about something I can't control.",
@@ -17,24 +22,62 @@ const suggestedQuestions: Record<string, string> = {
   Faith: "I'm struggling to trust God right now.",
 };
 
-function SectionLabel({ children }: { children: string }) {
-  const theme = useAppTheme();
-
-  return (
-    <Text variant="caption" style={{ color: theme.colors.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
-      {children}
-    </Text>
-  );
+function getErrorCopy(error: { code: AskScriptureErrorCode | 'unknown'; message: string }) {
+  switch (error.code) {
+    case 'daily_ask_limit':
+      return {
+        title: "That's all for today.",
+        body: "You've used today's free Ask Scripture questions. Come back tomorrow for more.",
+        canRetry: false,
+        showOfflineLinks: false,
+      };
+    case 'network':
+    case 'missing_api_url':
+      return {
+        title: error.code === 'missing_api_url' ? 'Ask Scripture needs setup.' : "Couldn't connect right now.",
+        body: error.code === 'missing_api_url'
+          ? 'Ask Scripture needs a Faith & Me API connection before it can respond.'
+          : 'Check your connection and try again. You can still read the Bible or continue today\'s moment offline.',
+        canRetry: error.code === 'network',
+        showOfflineLinks: true,
+      };
+    case 'ai_daily_cap':
+    case 'ask_scripture_disabled':
+    case 'server':
+      return {
+        title: 'Ask Scripture is taking a break.',
+        body: 'Your Bible, daily Scripture, and 5 Minutes With God are still available.',
+        canRetry: true,
+        showOfflineLinks: true,
+      };
+    case 'ask_already_in_progress':
+      return {
+        title: 'Still preparing your answer.',
+        body: 'Your previous question is still being prepared.',
+        canRetry: false,
+        showOfflineLinks: false,
+      };
+    default:
+      return {
+        title: 'Try that again?',
+        body: error.message,
+        canRetry: true,
+        showOfflineLinks: false,
+      };
+  }
 }
 
 export default function AskScreen() {
   const theme = useAppTheme();
+  const router = useRouter();
   const topics = getAskTopicLabels();
+  const inputRef = useRef<TextInput>(null);
   const [question, setQuestion] = useState('');
   const [result, setResult] = useState<AskScriptureResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Finding relevant Scripture...');
-  const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [error, setError] = useState<{ code: AskScriptureErrorCode | 'unknown'; message: string } | null>(null);
   const [usage, setUsage] = useState<AskScriptureUsage | null>(null);
 
   useEffect(() => {
@@ -44,7 +87,10 @@ export default function AskScreen() {
       .then((nextUsage) => {
         if (!cancelled) setUsage(nextUsage);
       })
-      .catch(() => {
+      .catch((caught) => {
+        if (__DEV__) {
+          console.warn('Ask Scripture usage unavailable', caught);
+        }
         if (!cancelled) setUsage(null);
       });
 
@@ -53,200 +99,299 @@ export default function AskScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!loading) return;
+
+    setLoadingMessage('Finding relevant Scripture...');
+    const timer = setTimeout(() => setLoadingMessage('Reflecting on these passages...'), 1800);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   const handleSubmit = async () => {
+    if (!canSubmit) return;
+
     Keyboard.dismiss();
     setError(null);
     setResult(null);
     setLoading(true);
-    setLoadingMessage('Reflecting on these passages...');
 
     try {
       const answer = await askScripture(question);
       setResult(answer);
+      setQuestion('');
       setUsage(answer.usage);
     } catch (caught) {
       if (caught instanceof AskScriptureError) {
-        setError(caught.message);
+        setError({ code: caught.code, message: caught.message });
       } else {
-        setError('Something went wrong while preparing your response.');
+        setError({ code: 'unknown', message: 'Something went wrong while preparing your response.' });
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleTopicPress = (topic: string) => {
+    setQuestion(suggestedQuestions[topic] ?? topic);
+    setResult(null);
+    setError(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const handleReset = () => {
+    setResult(null);
+    setError(null);
+    setQuestion('');
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   const exhausted = usage ? usage.remaining <= 0 : false;
-  const canSubmit = question.trim().length >= 8 && !loading && !exhausted;
+  const normalizedQuestion = question.trim().replace(/\s+/g, ' ');
+  const hasMeaningfulContent = normalizedQuestion.length >= 8 && /[A-Za-z]/.test(normalizedQuestion);
+  const canSubmit = hasMeaningfulContent && !loading && !exhausted && !result;
   const usageLabel = usage
     ? `${usage.remaining} question${usage.remaining === 1 ? '' : 's'} available today`
     : 'Ask Scripture usage will update when connected.';
+  const showCharacterCount = question.length > 0;
+  const errorCopy = error ? getErrorCopy(error) : null;
 
   return (
-    <Screen contentContainerStyle={styles.container} scrollProps={{ keyboardShouldPersistTaps: 'handled' }}>
-      <Text variant="display">Ask Scripture</Text>
-      <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-        What&apos;s on your heart?
-      </Text>
-      <Text variant="bodySmall" style={{ color: theme.colors.textMuted, marginTop: -4 }}>
-        Ask about Scripture, faith, or something you&apos;re going through.
-      </Text>
+    <Screen
+      contentContainerStyle={styles.container}
+      scrollProps={{
+        keyboardShouldPersistTaps: 'handled',
+        keyboardDismissMode: 'interactive',
+        automaticallyAdjustKeyboardInsets: true,
+      }}
+    >
+      {!result ? (
+        <>
+          <View style={styles.hero}>
+            <BrandMark size="small" />
+            <Text variant="display">Ask Scripture</Text>
+            <Text variant="headingSerif" style={styles.heartHeading}>
+              What&apos;s on your heart?
+            </Text>
+            <Text variant="body" style={{ color: theme.colors.textSecondary }}>
+              Ask about Scripture, faith, or something you&apos;re going through.
+            </Text>
+          </View>
 
-      <Text variant="bodySmall" style={{ color: exhausted ? theme.colors.warning : theme.colors.textMuted }}>
-        {usageLabel}
-      </Text>
+          <Text variant="bodySmall" style={{ color: exhausted ? theme.colors.warning : theme.colors.textMuted }}>
+            {usageLabel}
+          </Text>
 
-      {exhausted ? (
-        <Card style={[styles.statusCard, { borderColor: theme.colors.warning }]}>
-          <Text variant="subheading">You&apos;ve used today&apos;s free questions.</Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Come back tomorrow for more.</Text>
-        </Card>
-      ) : null}
+          {exhausted ? (
+            <View style={[styles.notice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surface }]}>
+              <Text variant="subheading">You&apos;ve used today&apos;s free questions.</Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Come back tomorrow for more.</Text>
+            </View>
+          ) : null}
 
-      <View style={[styles.composer, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-        <TextInput
-          multiline
-          value={question}
-          onChangeText={setQuestion}
-          placeholder="I'm struggling with..."
-          placeholderTextColor={theme.colors.textMuted}
-          style={[styles.input, { color: theme.colors.text }]}
-          maxLength={800}
-          textAlignVertical="top"
-          editable={!loading && !exhausted}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Send question"
-          disabled={!canSubmit}
-          onPress={handleSubmit}
-          style={({ pressed }) => [
-            styles.sendButton,
-            {
-              backgroundColor: canSubmit ? theme.colors.accent : theme.colors.surfaceSecondary,
-              opacity: pressed ? 0.9 : canSubmit ? 1 : 0.55,
-            },
-          ]}
-        >
-          <Text variant="caption" style={{ color: canSubmit ? theme.colors.surface : theme.colors.textMuted }}>Send</Text>
-        </Pressable>
-      </View>
+          <View
+            style={[
+              styles.composer,
+              {
+                borderColor: focused ? theme.colors.accent : theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <TextInput
+              ref={inputRef}
+              multiline
+              value={question}
+              onChangeText={setQuestion}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder="I'm struggling with..."
+              placeholderTextColor={theme.colors.textMuted}
+              style={[styles.input, { color: theme.colors.text }]}
+              maxLength={MAX_QUESTION_LENGTH}
+              textAlignVertical="top"
+              editable={!loading && !exhausted}
+              accessibilityLabel="Ask Scripture question"
+              returnKeyType="default"
+            />
 
-      <Text variant="caption" style={{ color: theme.colors.textMuted, marginTop: 4 }}>
-        People often ask
-      </Text>
+            <View style={styles.composerFooter}>
+              <Text variant="caption" style={{ color: theme.colors.textMuted }}>
+                {showCharacterCount ? `${question.length}/${MAX_QUESTION_LENGTH}` : ' '}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Send question"
+                accessibilityState={{ disabled: !canSubmit || loading }}
+                disabled={!canSubmit}
+                onPress={handleSubmit}
+                style={({ pressed }) => [
+                  styles.sendButton,
+                  {
+                    backgroundColor: canSubmit ? theme.colors.accent : theme.colors.surfaceSecondary,
+                    opacity: pressed ? 0.86 : canSubmit ? 1 : 0.55,
+                  },
+                ]}
+              >
+                <Ionicons name="arrow-up" size={18} color={canSubmit ? theme.colors.surface : theme.colors.textMuted} />
+              </Pressable>
+            </View>
+          </View>
 
-      <View style={styles.suggestionsRow}>
-        {topics.map((topic) => (
-          <Chip key={topic} label={topic} onPress={() => setQuestion(suggestedQuestions[topic] ?? topic)} />
-        ))}
-      </View>
+          <View style={styles.suggestionsBlock}>
+            <Text variant="caption" style={{ color: theme.colors.textMuted }}>
+              People often ask
+            </Text>
+            <View style={styles.suggestionsRow}>
+              {topics.map((topic) => (
+                <Chip key={topic} label={topic} onPress={() => handleTopicPress(topic)} />
+              ))}
+            </View>
+          </View>
 
-      {error ? (
-        <Card style={[styles.statusCard, { borderColor: theme.colors.warning }]}>
-          <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{error}</Text>
-        </Card>
-      ) : null}
+          {errorCopy ? (
+            <View style={[styles.notice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surface }]}>
+              <Text variant="subheading">{errorCopy.title}</Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{errorCopy.body}</Text>
+              <View style={styles.noticeActions}>
+                {errorCopy.canRetry ? <Button title="Try again" variant="secondary" onPress={handleSubmit} disabled={!hasMeaningfulContent || loading || exhausted} /> : null}
+                {errorCopy.showOfflineLinks ? (
+                  <>
+                    <Button title="Read the Bible" variant="ghost" onPress={() => router.push('/(tabs)/bible')} />
+                    <Button title={"Today's Moment"} variant="ghost" onPress={() => router.push('/(tabs)')} />
+                  </>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
 
-      {loading ? (
-        <Card style={styles.loadingCard}>
-          <ActivityIndicator color={theme.colors.accent} />
-          <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{loadingMessage}</Text>
-        </Card>
-      ) : null}
-
-      {result ? (
+          {loading ? (
+            <View style={styles.loadingBlock}>
+              <View style={[styles.loadingLine, { backgroundColor: theme.colors.accent }]} />
+              <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{loadingMessage}</Text>
+            </View>
+          ) : null}
+        </>
+      ) : (
         <View style={styles.answerWrap}>
-          <View style={styles.section}>
-            <SectionLabel>Your Question</SectionLabel>
-            <Text variant="body" style={styles.quotedQuestion}>&quot;{result.question}&quot;</Text>
+          <View style={styles.answerHeader}>
+            <EditorialLabel>Ask Scripture</EditorialLabel>
+            <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>You asked</Text>
+            <Text variant="body" style={[styles.quotedQuestion, { color: theme.colors.textSecondary }]}>
+              &quot;{result.question}&quot;
+            </Text>
           </View>
 
           {result.answer.safetyNote ? (
-            <Card style={[styles.statusCard, { borderColor: theme.colors.warning }]}>
-              <SectionLabel>Safety</SectionLabel>
-              <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{result.answer.safetyNote}</Text>
-            </Card>
+            <View style={[styles.safetyNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surface }]}>
+              <EditorialLabel>Safety</EditorialLabel>
+              <Text variant="body" style={{ color: theme.colors.textSecondary }}>{result.answer.safetyNote}</Text>
+            </View>
           ) : null}
 
           <View style={styles.section}>
-            <SectionLabel>Scripture</SectionLabel>
+            <Text variant="body" style={[styles.summaryText, { color: theme.colors.textSecondary }]}>
+              {result.answer.summary}
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <EditorialLabel>Scripture</EditorialLabel>
             {result.scriptures.map((scripture, index) => (
-              <View key={scripture.reference} style={styles.scriptureBlock}>
+              <View key={scripture.reference} style={[styles.scriptureBlock, { borderLeftColor: theme.colors.accent }]}>
                 {index > 0 ? <Divider /> : null}
-                <Text variant="subheading">{scripture.passage.displayReference}</Text>
-                <Text variant="scripture" style={styles.scriptureText}>{scripture.passage.text}</Text>
+                <Text variant="subheading" style={{ color: theme.colors.accent }}>{scripture.passage.displayReference}</Text>
+                <Text variant="scripture" style={styles.scriptureText}>&quot;{scripture.passage.text}&quot;</Text>
                 <Text variant="scriptureReference" style={{ color: theme.colors.textSecondary }}>
-                  {scripture.passage.displayReference} · {scripture.passage.translation}
+                  BSB
                 </Text>
-                <Text variant="bodySmall" style={{ color: theme.colors.accent, marginTop: 8 }}>Why this matters:</Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.accent, marginTop: 10 }}>Why this matters</Text>
                 <Text variant="body" style={styles.answerText}>{scripture.reason}</Text>
               </View>
             ))}
           </View>
 
           <View style={styles.section}>
-            <SectionLabel>Context</SectionLabel>
+            <EditorialLabel>Context</EditorialLabel>
             <Text variant="body" style={styles.answerText}>{result.answer.context}</Text>
           </View>
 
           <View style={styles.section}>
-            <SectionLabel>What This Could Mean For You</SectionLabel>
+            <EditorialLabel>What This Could Mean For You</EditorialLabel>
             <Text variant="body" style={styles.answerText}>{result.answer.application}</Text>
           </View>
 
           <View style={styles.section}>
-            <SectionLabel>Reflect</SectionLabel>
+            <EditorialLabel>Reflect</EditorialLabel>
             {result.answer.reflectionQuestions.map((reflectionQuestion, index) => (
-              <Text key={reflectionQuestion} variant="body" style={styles.answerText}>
-                {index + 1}. {reflectionQuestion}
-              </Text>
+              <View key={reflectionQuestion} style={styles.reflectionRow}>
+                <Text variant="caption" style={{ color: theme.colors.accent }}>{String(index + 1).padStart(2, '0')}</Text>
+                <Text variant="body" style={[styles.answerText, styles.reflectionText]}>{reflectionQuestion}</Text>
+              </View>
             ))}
           </View>
 
           <View style={styles.section}>
-            <SectionLabel>Prayer</SectionLabel>
+            <EditorialLabel>Prayer</EditorialLabel>
             <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>If it&apos;s helpful, you might pray:</Text>
-            <Text variant="body" style={styles.answerText}>{result.answer.prayer}</Text>
+            <Text variant="body" style={[styles.answerText, styles.prayerText, { color: theme.colors.textSecondary }]}>{result.answer.prayer}</Text>
           </View>
 
-          <View style={styles.section}>
-            <SectionLabel>Next Step</SectionLabel>
+          <View style={[styles.nextStepBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.accentSoft }]}>
+            <EditorialLabel>One Small Step</EditorialLabel>
             <Text variant="body" style={styles.answerText}>{result.answer.nextStep}</Text>
           </View>
 
-          <Button title="Ask another question" variant="secondary" onPress={() => { setResult(null); setQuestion(''); }} />
+          <Button title="Ask something else" variant="secondary" onPress={handleReset} />
         </View>
-      ) : null}
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 14,
+    gap: 16,
+    paddingBottom: 92,
+  },
+  hero: {
+    gap: 8,
+    paddingTop: 16,
+  },
+  heartHeading: {
+    maxWidth: 300,
   },
   composer: {
-    minHeight: 128,
+    minHeight: 150,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 18,
+    borderRadius: 12,
     borderWidth: 1,
-    gap: 12,
+    gap: 10,
   },
   input: {
-    minHeight: 72,
+    minHeight: 88,
     fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 25,
     padding: 0,
+  },
+  composerFooter: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   sendButton: {
     alignSelf: 'flex-end',
-    minWidth: 72,
-    minHeight: 38,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
+  },
+  suggestionsBlock: {
+    gap: 10,
+    marginTop: 2,
   },
   suggestionsRow: {
     flexDirection: 'row',
@@ -255,16 +400,32 @@ const styles = StyleSheet.create({
     columnGap: 10,
     marginTop: 2,
   },
-  statusCard: {
+  notice: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 16,
+    gap: 10,
+  },
+  noticeActions: {
+    gap: 8,
     marginTop: 4,
   },
-  loadingCard: {
-    marginTop: 4,
+  loadingBlock: {
+    marginTop: 6,
+    gap: 12,
     alignItems: 'center',
   },
+  loadingLine: {
+    width: 42,
+    height: 2,
+    borderRadius: 2,
+  },
   answerWrap: {
-    gap: 22,
-    marginTop: 10,
+    gap: 26,
+    paddingTop: 16,
+  },
+  answerHeader: {
+    gap: 8,
   },
   section: {
     gap: 10,
@@ -272,14 +433,45 @@ const styles = StyleSheet.create({
   quotedQuestion: {
     fontStyle: 'italic',
   },
+  safetyNotice: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 16,
+    gap: 10,
+  },
+  summaryText: {
+    fontSize: 19,
+    lineHeight: 30,
+  },
   scriptureBlock: {
     gap: 8,
+    paddingLeft: 16,
+    borderLeftWidth: 2,
+    paddingVertical: 4,
   },
   scriptureText: {
-    fontSize: 24,
-    lineHeight: 34,
+    fontSize: 25,
+    lineHeight: 36,
   },
   answerText: {
-    lineHeight: 26,
+    lineHeight: 27,
+  },
+  reflectionRow: {
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'flex-start',
+    paddingVertical: 4,
+  },
+  reflectionText: {
+    flex: 1,
+  },
+  prayerText: {
+    lineHeight: 28,
+  },
+  nextStepBlock: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 16,
+    gap: 10,
   },
 });

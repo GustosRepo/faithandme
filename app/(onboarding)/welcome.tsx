@@ -1,15 +1,17 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Screen, Text } from '@/components/ui';
+import { BrandMark } from '@/components/BrandMark';
+import { Button, EditorialLabel, Screen, Text } from '@/components/ui';
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="display">Faith & Me</Text>
-      <Text variant="heading" style={styles.headline}>Scripture for what you're going through.</Text>
+      <BrandMark size="medium" />
+      <EditorialLabel>Faith & Me</EditorialLabel>
+      <Text variant="displaySerif" style={styles.headline}>Scripture for what you're going through.</Text>
       <Text variant="body" style={styles.subtleText}>Take a few moments to make Faith & Me yours.</Text>
 
       <View style={styles.footer}>
@@ -27,7 +29,7 @@ const styles = StyleSheet.create({
     gap: 18,
   },
   headline: {
-    maxWidth: 300,
+    maxWidth: 340,
   },
   subtleText: {
     maxWidth: 320,

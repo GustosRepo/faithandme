@@ -1,15 +1,15 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@/components/ui';
+import { Button, Card, EditorialLabel, Screen, Text } from '@/components/ui';
 
 export default function PreviewScreen() {
   const router = useRouter();
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="caption" style={styles.kicker}>Step 5 of 6</Text>
-      <Text variant="display">Keep His Word close.</Text>
+      <EditorialLabel>Step 5 of 6</EditorialLabel>
+      <Text variant="displaySerif">Keep His Word close.</Text>
       <Text variant="body" style={styles.subtleText}>Your daily Scripture can meet you right where you already are.</Text>
 
       <Card style={styles.widgetShell}>
@@ -34,10 +34,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'space-between',
     gap: 18,
-  },
-  kicker: {
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
   },
   subtleText: {
     maxWidth: 300,

@@ -1,16 +1,25 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Divider, Screen, SectionHeader, Text } from '@/components/ui';
+import { Button, Divider, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { useDailySession } from '@/hooks/useDailySession';
+import { defaultBibleActivityState, loadBibleActivityState, type BibleActivityState } from '@/storage/bibleActivity';
 
 export default function MeScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const { state, resetOnboarding } = useOnboarding();
   const { resetToday, resetStreak } = useDailySession();
+  const [bibleActivity, setBibleActivity] = useState<BibleActivityState>(defaultBibleActivityState);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadBibleActivityState().then(setBibleActivity);
+    }, []),
+  );
 
   const handleReset = () => {
     resetOnboarding();
@@ -27,10 +36,11 @@ export default function MeScreen() {
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="display">Me</Text>
+      <EditorialLabel>Me</EditorialLabel>
+      <Text variant="displaySerif">Your walk.</Text>
 
-      <Card style={styles.profileCard}>
-        <Text variant="subheading">Your Journey</Text>
+      <View style={[styles.profileBlock, { borderColor: theme.colors.rule }]}>
+        <Text variant="headingSerif">Your Journey</Text>
         <View style={styles.infoRow}>
           <Text variant="body">Current focus</Text>
           <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
@@ -45,12 +55,21 @@ export default function MeScreen() {
         </View>
         <View style={styles.infoRow}>
           <Text variant="body">Saved verses</Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>18</Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
+            {Object.keys(bibleActivity.bookmarks).length}
+          </Text>
         </View>
-      </Card>
+        <View style={styles.infoRow}>
+          <Text variant="body">Highlighted verses</Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
+            {Object.keys(bibleActivity.highlights).length}
+          </Text>
+        </View>
+        <Button title="Open saved Scripture" variant="secondary" onPress={() => router.push('/bible/saved')} />
+      </View>
 
-      <SectionHeader title="Preferences" />
-      <Card style={styles.preferenceCard}>
+      <EditorialLabel>Preferences</EditorialLabel>
+      <View style={[styles.preferenceBlock, { borderColor: theme.colors.rule }]}>
         <View style={styles.infoRow}>
           <Text variant="body">Bible translation</Text>
           <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Berean Standard Bible (BSB)</Text>
@@ -65,27 +84,27 @@ export default function MeScreen() {
           <Text variant="body">Appearance</Text>
           <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>System</Text>
         </View>
-      </Card>
+      </View>
 
       {__DEV__ ? (
-        <Card style={styles.devCard}>
-          <Text variant="subheading">Developer</Text>
+        <View style={[styles.devBlock, { borderColor: theme.colors.rule }]}>
+          <Text variant="headingSerif">Developer</Text>
           <Text variant="body" style={{ color: theme.colors.textSecondary }}>
             Clear onboarding state and reset the local daily moment state.
           </Text>
           <Button title="Reset onboarding" variant="secondary" onPress={handleReset} />
           <Button title="Reset today's moment" variant="secondary" onPress={handleResetToday} />
           <Button title="Reset streak" variant="secondary" onPress={handleResetStreak} />
-        </Card>
+        </View>
       ) : null}
 
-      <Card style={styles.proCard}>
-        <Text variant="subheading">Faith & Me Pro</Text>
+      <View style={[styles.proBlock, { borderColor: theme.colors.rule }]}>
+        <Text variant="headingSerif">Faith & Me Pro</Text>
         <Text variant="body" style={{ color: theme.colors.textSecondary }}>
           Premium widgets • Unlimited Ask Scripture • Personalization
         </Text>
         <Button title="View Pro" variant="secondary" onPress={() => undefined} />
-      </Card>
+      </View>
     </Screen>
   );
 }
@@ -94,9 +113,11 @@ const styles = StyleSheet.create({
   container: {
     gap: 16,
   },
-  profileCard: {
+  profileBlock: {
     gap: 12,
     paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   infoRow: {
     flexDirection: 'row',
@@ -104,16 +125,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  preferenceCard: {
+  preferenceBlock: {
     gap: 8,
     paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  devCard: {
+  devBlock: {
     gap: 12,
     paddingVertical: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  proCard: {
+  proBlock: {
     gap: 12,
     paddingVertical: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
 });

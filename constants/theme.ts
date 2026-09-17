@@ -11,10 +11,10 @@ export const spacing = {
 } as const;
 
 export const radii = {
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 22,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 18,
   full: 999,
 } as const;
 
@@ -28,6 +28,8 @@ export type ThemeColors = {
   border: string;
   accent: string;
   accentSoft: string;
+  wine: string;
+  rule: string;
   success: string;
   warning: string;
 };
@@ -43,17 +45,19 @@ export const theme: Record<ThemeMode, AppTheme> = {
   light: {
     mode: 'light',
     colors: {
-      background: '#F5F0E7',
-      surface: '#F9F4EE',
-      surfaceSecondary: '#F0E8DD',
-      text: '#1E1D1A',
-      textSecondary: '#4E4945',
-      textMuted: '#7A736C',
-      border: '#E1D5C2',
-      accent: '#596B4D',
-      accentSoft: '#E2E8DB',
-      success: '#4A745C',
-      warning: '#C98C45',
+      background: '#F4EFE5',
+      surface: '#FBF7F0',
+      surfaceSecondary: '#ECE4D6',
+      text: '#24231F',
+      textSecondary: '#514C43',
+      textMuted: '#7C7468',
+      border: '#D8CCB8',
+      accent: '#4D5738',
+      accentSoft: '#DDE1D1',
+      wine: '#743C35',
+      rule: '#D1C4AE',
+      success: '#526A43',
+      warning: '#A76534',
     },
     spacing,
     radii,
@@ -61,17 +65,19 @@ export const theme: Record<ThemeMode, AppTheme> = {
   dark: {
     mode: 'dark',
     colors: {
-      background: '#1A1917',
-      surface: '#221F1D',
-      surfaceSecondary: '#2A2624',
-      text: '#F3EEE8',
-      textSecondary: '#DCD2C8',
-      textMuted: '#B7AEA2',
-      border: '#3C3632',
-      accent: '#A9B796',
-      accentSoft: '#2E352E',
-      success: '#8AB89C',
-      warning: '#D6A86D',
+      background: '#181612',
+      surface: '#211E19',
+      surfaceSecondary: '#2B261F',
+      text: '#F2EBDD',
+      textSecondary: '#D8CCB9',
+      textMuted: '#AFA391',
+      border: '#40382E',
+      accent: '#B5C09A',
+      accentSoft: '#303727',
+      wine: '#C08A80',
+      rule: '#4A4135',
+      success: '#9CB58A',
+      warning: '#D09A64',
     },
     spacing,
     radii,

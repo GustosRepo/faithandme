@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 const clientIdKey = 'faithandme.anonymousClientId.v1';
@@ -6,6 +7,9 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 function generateUuid() {
   const randomUuid = globalThis.crypto?.randomUUID?.();
   if (randomUuid) return randomUuid;
+
+  const expoUuid = Crypto.randomUUID();
+  if (expoUuid) return expoUuid;
 
   const bytes = new Uint8Array(16);
   globalThis.crypto?.getRandomValues?.(bytes);

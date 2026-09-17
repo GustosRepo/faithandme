@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Chip, Screen, Text } from '@/components/ui';
+import { Button, Card, Chip, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useOnboarding } from '@/context/OnboardingContext';
 
 const reminderOptions = [
@@ -19,8 +19,8 @@ export default function ReminderScreen() {
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="caption" style={styles.kicker}>Step 4 of 6</Text>
-      <Text variant="display">When would you like a moment with God?</Text>
+      <EditorialLabel>Step 4 of 6</EditorialLabel>
+      <Text variant="displaySerif">When would you like a moment with God?</Text>
 
       <Card style={styles.optionCard}>
         <View style={styles.optionGrid}>
@@ -50,10 +50,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'space-between',
     gap: 18,
-  },
-  kicker: {
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
   },
   optionCard: {
     paddingVertical: 18,

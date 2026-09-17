@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Divider, Screen, SectionHeader, Text } from '@/components/ui';
+import { Button, Divider, EditorialLabel, Screen, SectionHeader, Text } from '@/components/ui';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
 const journalEntries = [
@@ -26,9 +26,10 @@ export default function JournalScreen() {
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="display">Journal</Text>
+      <EditorialLabel>Journal</EditorialLabel>
+      <Text variant="displaySerif">Private reflection.</Text>
       <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-        Private reflection and prayer.
+        Prayer, gratitude, and the thoughts you want to keep with God.
       </Text>
 
       <View style={styles.actionsRow}>
@@ -42,7 +43,7 @@ export default function JournalScreen() {
         {journalEntries.map((entry, index) => (
           <View key={entry.title}>
             <View style={styles.entryRow}>
-              <Text variant="caption" style={{ color: theme.colors.textMuted }}>{entry.title}</Text>
+              <EditorialLabel>{entry.title}</EditorialLabel>
               <Text variant="caption" style={{ color: theme.colors.textMuted }}>{entry.date}</Text>
             </View>
             <Text variant="body" style={{ color: theme.colors.textSecondary, marginTop: 8 }}>

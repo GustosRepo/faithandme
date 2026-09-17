@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@/components/ui';
+import { Button, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useOnboarding } from '@/context/OnboardingContext';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 function deriveFocusChips(state: ReturnType<typeof useOnboarding>['state']): string[] {
   const valueMap: Record<string, string[]> = {
@@ -37,6 +38,7 @@ function deriveFocusChips(state: ReturnType<typeof useOnboarding>['state']): str
 
 export default function ReadyScreen() {
   const router = useRouter();
+  const theme = useAppTheme();
   const { completeOnboarding, state } = useOnboarding();
   const focusChips = deriveFocusChips(state);
 
@@ -56,22 +58,23 @@ export default function ReadyScreen() {
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <Text variant="display">Faith & Me is ready for you.</Text>
+      <EditorialLabel>Step 6 of 6</EditorialLabel>
+      <Text variant="displaySerif">Faith & Me is ready for you.</Text>
       <Text variant="body" style={styles.subtleText}>{summary}</Text>
 
       <View style={styles.focusBlock}>
-        <Text variant="caption" style={styles.kicker}>YOUR FOCUS</Text>
+        <EditorialLabel>Your Focus</EditorialLabel>
         <View style={styles.chipRow}>
           {focusChips.length > 0 ? (
             focusChips.map((chip) => (
-              <Card key={chip} style={styles.focusChip}>
+              <View key={chip} style={[styles.focusChip, { borderColor: theme.colors.rule }]}>
                 <Text variant="bodySmall">{chip}</Text>
-              </Card>
+              </View>
             ))
           ) : (
-            <Card style={styles.focusChip}>
+            <View style={[styles.focusChip, { borderColor: theme.colors.rule }]}>
               <Text variant="bodySmall">Peace</Text>
-            </Card>
+            </View>
           )}
         </View>
       </View>
@@ -92,10 +95,6 @@ const styles = StyleSheet.create({
   subtleText: {
     maxWidth: 300,
   },
-  kicker: {
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
   focusBlock: {
     gap: 12,
   },
@@ -107,7 +106,8 @@ const styles = StyleSheet.create({
   focusChip: {
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 999,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   footer: {
     marginTop: 12,
