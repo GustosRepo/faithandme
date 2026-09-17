@@ -5,6 +5,12 @@ import type { AskScriptureRequest, ModelAskScriptureResponse } from '../schemas/
 import { sanitizeModelResponse } from './validation.js';
 import { safetyInstructionFor, type SafetyLevel } from './safety.js';
 
+export type OpenAiTokenUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+};
+
 function buildResponseSchema(allowedReferences: string[]) {
   return {
     type: 'object',
@@ -88,11 +94,14 @@ function buildPrompt(request: AskScriptureRequest, safetyLevel: SafetyLevel) {
 export async function createAskScriptureResponse(
   request: AskScriptureRequest,
   safetyLevel: SafetyLevel,
-): Promise<ModelAskScriptureResponse> {
+): Promise<{ answer: ModelAskScriptureResponse; tokenUsage: OpenAiTokenUsage }> {
   const response = await getClient().responses.create({
     model: serverConfig.openAiModel,
     input: buildPrompt(request, safetyLevel),
     max_output_tokens: serverConfig.limits.maxOutputTokens,
+    reasoning: {
+      effort: serverConfig.openAiReasoningEffort,
+    },
     text: {
       format: {
         type: 'json_schema',
@@ -109,5 +118,12 @@ export async function createAskScriptureResponse(
   }
 
   const parsed = JSON.parse(rawText) as unknown;
-  return sanitizeModelResponse(parsed, request.passages.map((passage) => passage.reference));
+  return {
+    answer: sanitizeModelResponse(parsed, request.passages.map((passage) => passage.reference)),
+    tokenUsage: {
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+      totalTokens: response.usage?.total_tokens,
+    },
+  };
 }

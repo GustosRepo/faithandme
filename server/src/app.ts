@@ -13,7 +13,7 @@ export function createApp() {
   app.use(cors({
     origin: true,
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type'],
+    allowedHeaders: ['Content-Type', 'X-Faith-Client-Id'],
     maxAge: 86400,
   }));
   app.use(express.json({ limit: '12kb', strict: true }));

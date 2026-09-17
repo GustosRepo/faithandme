@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button, Card, Chip, Divider, Screen, Text } from '@/components/ui';
 import { useAppTheme } from '@/hooks/useAppTheme';
-import { askScripture } from '@/services/ask/AskScriptureService';
+import { askScripture, getAskScriptureUsage } from '@/services/ask/AskScriptureService';
 import { getAskTopicLabels } from '@/services/ask/scriptureRetrieval';
-import type { AskScriptureResult } from '@/services/ask/types';
+import type { AskScriptureResult, AskScriptureUsage } from '@/services/ask/types';
 import { AskScriptureError } from '@/services/ask/types';
 
 const suggestedQuestions: Record<string, string> = {
@@ -35,6 +35,23 @@ export default function AskScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Finding relevant Scripture...');
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<AskScriptureUsage | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getAskScriptureUsage()
+      .then((nextUsage) => {
+        if (!cancelled) setUsage(nextUsage);
+      })
+      .catch(() => {
+        if (!cancelled) setUsage(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = async () => {
     Keyboard.dismiss();
@@ -46,6 +63,7 @@ export default function AskScreen() {
     try {
       const answer = await askScripture(question);
       setResult(answer);
+      setUsage(answer.usage);
     } catch (caught) {
       if (caught instanceof AskScriptureError) {
         setError(caught.message);
@@ -57,7 +75,11 @@ export default function AskScreen() {
     }
   };
 
-  const canSubmit = question.trim().length >= 8 && !loading;
+  const exhausted = usage ? usage.remaining <= 0 : false;
+  const canSubmit = question.trim().length >= 8 && !loading && !exhausted;
+  const usageLabel = usage
+    ? `${usage.remaining} question${usage.remaining === 1 ? '' : 's'} available today`
+    : 'Ask Scripture usage will update when connected.';
 
   return (
     <Screen contentContainerStyle={styles.container} scrollProps={{ keyboardShouldPersistTaps: 'handled' }}>
@@ -69,6 +91,17 @@ export default function AskScreen() {
         Ask about Scripture, faith, or something you&apos;re going through.
       </Text>
 
+      <Text variant="bodySmall" style={{ color: exhausted ? theme.colors.warning : theme.colors.textMuted }}>
+        {usageLabel}
+      </Text>
+
+      {exhausted ? (
+        <Card style={[styles.statusCard, { borderColor: theme.colors.warning }]}>
+          <Text variant="subheading">You&apos;ve used today&apos;s free questions.</Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Come back tomorrow for more.</Text>
+        </Card>
+      ) : null}
+
       <View style={[styles.composer, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         <TextInput
           multiline
@@ -79,6 +112,7 @@ export default function AskScreen() {
           style={[styles.input, { color: theme.colors.text }]}
           maxLength={800}
           textAlignVertical="top"
+          editable={!loading && !exhausted}
         />
         <Pressable
           accessibilityRole="button"

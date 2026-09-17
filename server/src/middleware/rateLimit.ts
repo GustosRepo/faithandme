@@ -21,7 +21,7 @@ export function rateLimit(req: Request, res: Response, next: NextFunction) {
   }
 
   if (current.count >= serverConfig.limits.rateLimitMaxRequests) {
-    res.status(429).json({ error: { code: 'rate_limited', message: 'Please wait a moment before asking another question.' } });
+    res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Please wait a moment before asking again.' } });
     return;
   }
 

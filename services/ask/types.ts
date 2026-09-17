@@ -26,6 +26,14 @@ export type AskScriptureApiResponse = {
   requestId: string;
   safetyLevel: 'standard' | 'immediate-danger';
   answer: AskScriptureAnswerPayload;
+  usage: AskScriptureUsage;
+};
+
+export type AskScriptureUsage = {
+  limit: number;
+  used: number;
+  remaining: number;
+  resetsAt: string;
 };
 
 export type ResolvedAskScripture = AskScriptureModelScripture & {
@@ -38,9 +46,21 @@ export type AskScriptureResult = {
   scriptures: ResolvedAskScripture[];
   answer: Omit<AskScriptureAnswerPayload, 'scriptures'>;
   safetyLevel: AskScriptureApiResponse['safetyLevel'];
+  usage: AskScriptureUsage;
 };
 
-export type AskScriptureErrorCode = 'invalid_question' | 'missing_api_url' | 'rate_limited' | 'network' | 'server';
+export type AskScriptureErrorCode =
+  | 'invalid_question'
+  | 'missing_api_url'
+  | 'invalid_client_id'
+  | 'daily_ask_limit'
+  | 'ip_daily_limit'
+  | 'ai_daily_cap'
+  | 'ask_scripture_disabled'
+  | 'ask_already_in_progress'
+  | 'rate_limited'
+  | 'network'
+  | 'server';
 
 export class AskScriptureError extends Error {
   code: AskScriptureErrorCode;

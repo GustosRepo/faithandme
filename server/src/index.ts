@@ -1,7 +1,9 @@
 import { createApp } from './app.js';
 import { assertProductionConfig, serverConfig } from './config.js';
+import { initializeUsageStore } from './services/usageStore.js';
 
 assertProductionConfig();
+await initializeUsageStore();
 
 const app = createApp();
 

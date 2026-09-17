@@ -66,7 +66,37 @@
 - [x] server/.env.example and deployment notes added
 - [x] Server TypeScript build and focused validation tests pass
 - [x] Live OpenAI response validation completed with server-loaded OPENAI_API_KEY
-- [ ] Railway deployment validation pending deployed API URL
+- [x] Railway deployment validation completed with production API URL
+
+## Phase 5A.1 status
+
+- [x] Anonymous install identity added using expo-secure-store
+- [x] Ask requests include server-validated X-Faith-Client-Id
+- [x] Server-authoritative daily free Ask limit added
+- [x] GET /api/ask-scripture/usage added for authoritative remaining count
+- [x] Durable anonymous usage persistence implemented with PostgreSQL-compatible DATABASE_URL
+- [x] Daily AI usage buckets use server UTC date, distinct from local devotional dates
+- [x] Hashed daily IP abuse bucket added without storing raw IP addresses
+- [x] Global daily AI cap added
+- [x] ASK_SCRIPTURE_ENABLED emergency kill switch added
+- [x] Per-client in-flight request guard added
+- [x] Mobile Ask screen displays restrained remaining/free-exhausted state
+- [x] No user accounts, authentication, cross-device sync, RevenueCat, pgvector, or embeddings added
+- [x] Focused anonymous usage policy tests pass
+
+## Phase 5A.2 status
+
+- [x] Ask Scripture default model changed server-side to gpt-5.6-luna
+- [x] OPENAI_MODEL override preserved for Railway/local operations
+- [x] Mobile app cannot choose or override the OpenAI model
+- [x] Reasoning effort centralized and defaulted to low
+- [x] Structured Outputs retained through the Responses API JSON schema path
+- [x] Output token ceiling remains centralized in serverConfig.limits.maxOutputTokens
+- [x] No fallback to a more expensive model added
+- [x] Privacy-safe OpenAI token usage captured in server logs only
+- [x] Existing free daily, hashed-IP, global daily cap, emergency switch, and in-flight guards preserved
+- [x] Live Luna API request attempted with local key; OpenAI returned 403 model_not_found because the current project does not yet have gpt-5.6-luna access
+- [x] No RAG, embeddings, auth, RevenueCat, or paid tier plumbing added
 
 ## Notes
 
