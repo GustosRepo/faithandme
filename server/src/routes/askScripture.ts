@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { Router } from 'express';
 import { ZodError } from 'zod';
 
@@ -25,7 +27,7 @@ function getSafeErrorInfo(error: unknown) {
 }
 
 askScriptureRouter.post('/ask-scripture', async (req, res) => {
-  const requestId = crypto.randomUUID();
+  const requestId = randomUUID();
   const startedAt = Date.now();
 
   try {

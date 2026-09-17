@@ -1,5 +1,5 @@
 import cors from 'cors';
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 
 import { rateLimit } from './middleware/rateLimit.js';
 import { askScriptureRouter } from './routes/askScripture.js';
@@ -23,6 +23,11 @@ export function createApp() {
   });
 
   app.use('/api', rateLimit, askScriptureRouter);
+
+  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(JSON.stringify({ endpoint: 'unknown', status: 500, error: 'unhandled' }));
+    res.status(500).json({ error: { code: 'server_error', message: 'Something went wrong while preparing your response.' } });
+  });
 
   app.use((_req, res) => {
     res.status(404).json({ error: { code: 'not_found', message: 'Not found.' } });
