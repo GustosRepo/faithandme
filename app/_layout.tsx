@@ -24,6 +24,8 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(onboarding)" />
+            <Stack.Screen name="upgrade" />
+            <Stack.Screen name="review/weekly" />
           </Stack>
         </OnboardingProvider>
       </ThemeProvider>

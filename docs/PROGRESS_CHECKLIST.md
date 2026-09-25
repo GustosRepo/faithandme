@@ -159,8 +159,85 @@
 - [x] Simulator visual QA completed for empty Saved Scripture state
 - [ ] Manually QA verse highlight/bookmark tap states, Mark chapter read, and Me counts on simulator/device
 
+## Ask + Journal development status
+
+- [x] Journal mock data replaced with local AsyncStorage-backed entries
+- [x] Journal supports prayer, reflection, and gratitude entry types
+- [x] Journal entry counts update from real local entries
+- [x] Journal entries can be created and deleted locally
+- [x] Journal list uses paged previews for longer archives
+- [x] Long entries open in a full-entry detail view instead of expanding in the list
+- [x] Ask Scripture answers can be saved to Journal as reflection entries
+- [x] Saved Ask entries include the question, Scripture, reflection prompts, prayer, and next step
+- [x] TypeScript validation passes after Ask + Journal changes
+- [ ] QA manual Journal create/delete persistence on simulator/device
+- [ ] QA long Journal entry preview/detail behavior on simulator/device
+- [ ] QA Journal Show more behavior with many saved entries
+- [ ] QA Ask answer save-to-Journal flow on simulator/device
+
+## Me dashboard development status
+
+- [x] Me tab upgraded from static profile to real personal dashboard
+- [x] Me shows current streak, today progress, and Ask usage
+- [x] Me shows Bible completed chapter, saved verse, highlight, and continue-reading stats
+- [x] Me shows Journal prayer, reflection, gratitude, and Ask-saved counts
+- [x] Me includes active shortcuts to Today, Bible, Journal, Ask, and Saved Scripture
+- [x] Inactive Faith & Me Pro placeholder removed from Me
+- [x] TypeScript validation passes after Me dashboard changes
+- [ ] QA Me dashboard stat refresh on simulator/device
+- [ ] QA Continue Reading shortcut from Me on simulator/device
+
+## Plus upgrade development status
+
+- [x] Dedicated Plus upgrade screen added
+- [x] Me includes visible Upgrade to Plus entry points
+- [x] Ask exhausted state links to Upgrade
+- [x] Upgrade/restore actions use temporary setup alerts
+- [x] Plus product strategy documented around depth, continuity, and convenience
+- [x] Free tier protections documented: Bible, daily moment, basic Journal, saved Scripture, highlights, safety support, and small Ask limit stay free
+- [x] Best first Plus gates documented: higher Ask limit, Ask follow-ups, guided Journal prompts, search/filters, weekly review, devotional paths, exports, and advanced reminder rhythms
+- [x] Later Plus gates documented: sync, encrypted backup, widgets, audio/prayer mode, longer plans, and privacy-controlled AI memory
+- [x] Ask follow-up actions implemented: Go deeper, Explain context, Turn into prayer, and 3-day plan
+- [x] Journal guided prompts implemented for prayer, reflection, and gratitude
+- [x] Journal local search implemented
+- [x] Journal filters implemented for all, prayer, reflection, gratitude, and Ask-saved entries
+- [x] Plus screen copy updated to match the first Plus offer
+- [x] Saved Scripture local search implemented
+- [x] Saved Scripture filters implemented for all, bookmarks, and highlights
+- [x] First local Weekly Review screen implemented
+- [x] Me shortcut added for Weekly Review
+- [x] TypeScript validation passes after upgrade entry-point changes
+- [ ] Create App Store Connect subscription products
+- [ ] Wire RevenueCat or StoreKit purchase flow
+- [ ] Add entitlement-aware Ask limits server-side
+- [x] Add saved Scripture search and filters
+- [x] Add first Plus weekly spiritual review
+- [ ] Add Plus personalized devotional paths
+- [ ] Add Plus export/share for prayers, reflections, and Ask answers
+- [ ] QA Upgrade screen and exhausted Ask upgrade path on simulator/device
+- [ ] QA Ask follow-up actions on simulator/device
+- [ ] QA Journal guided prompts, search, and filters on simulator/device
+- [ ] QA Saved Scripture search and filters on simulator/device
+- [ ] QA Weekly Review on simulator/device
+
+## Background texture development status
+
+- [x] FaithBackground paper texture layer added
+- [x] Texture uses vector grain specks, page fibers, faint margin rules, and margin dots
+- [x] Texture opacity is theme-aware for light and dark mode
+- [x] No image assets or heavy decorative gradients added
+- [x] TypeScript validation passes after background texture changes
+- [ ] QA background texture readability in light and dark mode on simulator/device
+
 ## Next priority
 
+- [ ] QA background texture across primary screens
+- [ ] Decide RevenueCat vs direct StoreKit for subscription plumbing
+- [ ] Implement first devotional paths
+- [ ] Implement export/share for Journal entries and Ask answers
+- [ ] Complete Plus upgrade simulator/device QA
+- [ ] Complete Me dashboard simulator/device QA
+- [ ] Complete Ask + Journal simulator/device QA
 - [ ] Complete manual Phase 5A.5 Bible interaction QA for highlight/bookmark, Mark chapter read, and Me counts
 - [ ] Complete remaining Phase 5A.4 visual QA on simulator/device
 - [ ] Finish the remaining Phase 5A.3 full Ask UI submission and exhausted-state validation in the actual app UI

@@ -10,6 +10,7 @@ import { askScripture, getAskScriptureUsage } from '@/services/ask/AskScriptureS
 import { getAskTopicLabels } from '@/services/ask/scriptureRetrieval';
 import type { AskScriptureErrorCode, AskScriptureResult, AskScriptureUsage } from '@/services/ask/types';
 import { AskScriptureError } from '@/services/ask/types';
+import { addJournalEntry } from '@/storage/journal';
 
 const MAX_QUESTION_LENGTH = 800;
 
@@ -21,6 +22,25 @@ const suggestedQuestions: Record<string, string> = {
   Money: "I'm worried about money and how to handle it faithfully.",
   Faith: "I'm struggling to trust God right now.",
 };
+
+const followUpActions = [
+  {
+    label: 'Go deeper',
+    prompt: (result: AskScriptureResult) => `Go deeper on this answer to my question: "${result.question}". Help me understand what I may be missing and how to sit with this Scripture.`,
+  },
+  {
+    label: 'Explain context',
+    prompt: (result: AskScriptureResult) => `Explain the biblical context behind these passages from my question: "${result.question}". Keep it pastoral and easy to understand.`,
+  },
+  {
+    label: 'Turn into prayer',
+    prompt: (result: AskScriptureResult) => `Turn this answer into a personal prayer for me: "${result.question}".`,
+  },
+  {
+    label: '3-day plan',
+    prompt: (result: AskScriptureResult) => `Give me a simple 3-day Scripture reflection plan based on this question: "${result.question}".`,
+  },
+] as const;
 
 function getErrorCopy(error: { code: AskScriptureErrorCode | 'unknown'; message: string }) {
   switch (error.code) {
@@ -79,6 +99,8 @@ export default function AskScreen() {
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<{ code: AskScriptureErrorCode | 'unknown'; message: string } | null>(null);
   const [usage, setUsage] = useState<AskScriptureUsage | null>(null);
+  const [savingToJournal, setSavingToJournal] = useState(false);
+  const [savedToJournal, setSavedToJournal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +135,7 @@ export default function AskScreen() {
     Keyboard.dismiss();
     setError(null);
     setResult(null);
+    setSavedToJournal(false);
     setLoading(true);
 
     try {
@@ -135,6 +158,7 @@ export default function AskScreen() {
     setQuestion(suggestedQuestions[topic] ?? topic);
     setResult(null);
     setError(null);
+    setSavedToJournal(false);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
@@ -142,6 +166,48 @@ export default function AskScreen() {
     setResult(null);
     setError(null);
     setQuestion('');
+    setSavedToJournal(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const handleSaveToJournal = async () => {
+    if (!result || savingToJournal || savedToJournal) return;
+
+    setSavingToJournal(true);
+    try {
+      const scriptureLines = result.scriptures
+        .map((scripture) => `${scripture.passage.displayReference}: ${scripture.passage.text}`)
+        .join('\n\n');
+      const reflectionLines = result.answer.reflectionQuestions
+        .map((reflectionQuestion, index) => `${index + 1}. ${reflectionQuestion}`)
+        .join('\n');
+
+      await addJournalEntry({
+        kind: 'reflection',
+        title: 'Ask Scripture Reflection',
+        source: 'ask',
+        content: [
+          `Question: ${result.question}`,
+          result.answer.summary,
+          scriptureLines ? `Scripture:\n${scriptureLines}` : '',
+          `Context:\n${result.answer.context}`,
+          `Application:\n${result.answer.application}`,
+          reflectionLines ? `Reflect:\n${reflectionLines}` : '',
+          `Prayer:\n${result.answer.prayer}`,
+          `Next step:\n${result.answer.nextStep}`,
+        ].filter(Boolean).join('\n\n'),
+      });
+      setSavedToJournal(true);
+    } finally {
+      setSavingToJournal(false);
+    }
+  };
+
+  const handleFollowUp = (nextQuestion: string) => {
+    setQuestion(nextQuestion);
+    setResult(null);
+    setError(null);
+    setSavedToJournal(false);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
@@ -185,6 +251,7 @@ export default function AskScreen() {
             <View style={[styles.notice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surface }]}>
               <Text variant="subheading">You&apos;ve used today&apos;s free questions.</Text>
               <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Come back tomorrow for more.</Text>
+              <Button title="View upgrade" variant="secondary" onPress={() => router.push('/upgrade')} />
             </View>
           ) : null}
 
@@ -260,6 +327,7 @@ export default function AskScreen() {
                     <Button title={"Today's Moment"} variant="ghost" onPress={() => router.push('/(tabs)')} />
                   </>
                 ) : null}
+                {error?.code === 'daily_ask_limit' ? <Button title="View upgrade" variant="ghost" onPress={() => router.push('/upgrade')} /> : null}
               </View>
             </View>
           ) : null}
@@ -341,7 +409,28 @@ export default function AskScreen() {
             <Text variant="body" style={styles.answerText}>{result.answer.nextStep}</Text>
           </View>
 
-          <Button title="Ask something else" variant="secondary" onPress={handleReset} />
+          <View style={styles.section}>
+            <EditorialLabel>Follow up</EditorialLabel>
+            <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
+              Use this answer as a starting point for a deeper question.
+            </Text>
+            <View style={styles.followUpRow}>
+              {followUpActions.map((action) => (
+                <Chip key={action.label} label={action.label} onPress={() => handleFollowUp(action.prompt(result))} />
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.answerActions}>
+            <Button
+              title={savedToJournal ? 'Saved to Journal' : savingToJournal ? 'Saving...' : 'Save to Journal'}
+              variant={savedToJournal ? 'secondary' : 'primary'}
+              disabled={savingToJournal || savedToJournal}
+              onPress={handleSaveToJournal}
+            />
+            {savedToJournal ? <Button title="Open Journal" variant="ghost" onPress={() => router.push('/(tabs)/journal')} /> : null}
+            <Button title="Ask something else" variant="secondary" onPress={handleReset} />
+          </View>
         </View>
       )}
     </Screen>
@@ -473,5 +562,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     gap: 10,
+  },
+  answerActions: {
+    gap: 10,
+  },
+  followUpRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 10,
+    columnGap: 10,
   },
 });

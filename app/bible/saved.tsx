@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { Button, EditorialLabel, Screen, Text } from '@/components/ui';
+import { Button, Chip, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { scriptureService } from '@/services/scripture/ScriptureService';
 import {
@@ -16,17 +17,27 @@ import {
   type BibleSavedVerse,
 } from '@/storage/bibleActivity';
 
-type SavedMode = 'bookmarks' | 'highlights';
+type SavedMode = 'all' | 'bookmarks' | 'highlights';
+type SavedVerseItem = BibleSavedVerse & {
+  savedKind: 'bookmark' | 'highlight';
+  color?: BibleHighlightedVerse['color'];
+};
 
 function sortSavedVerses<T extends BibleSavedVerse>(verses: T[]): T[] {
   return [...verses].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
+function getSavedReference(verse: BibleSavedVerse) {
+  const book = scriptureService.getBook(verse.bookId);
+  return book ? `${book.name} ${verse.chapter}:${verse.verse}` : verse.reference;
+}
+
 export default function SavedBibleScreen() {
   const router = useRouter();
   const theme = useAppTheme();
-  const [mode, setMode] = useState<SavedMode>('bookmarks');
+  const [mode, setMode] = useState<SavedMode>('all');
   const [activity, setActivity] = useState<BibleActivityState>(defaultBibleActivityState);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -36,7 +47,28 @@ export default function SavedBibleScreen() {
 
   const bookmarks = useMemo(() => sortSavedVerses(Object.values(activity.bookmarks)), [activity.bookmarks]);
   const highlights = useMemo(() => sortSavedVerses(Object.values(activity.highlights)), [activity.highlights]);
-  const visibleVerses = mode === 'bookmarks' ? bookmarks : highlights;
+  const savedItems = useMemo<SavedVerseItem[]>(() => {
+    const bookmarkItems = bookmarks.map((verse): SavedVerseItem => ({ ...verse, savedKind: 'bookmark' }));
+    const highlightItems = highlights.map((verse): SavedVerseItem => ({ ...verse, savedKind: 'highlight', color: verse.color }));
+    return sortSavedVerses([...bookmarkItems, ...highlightItems]);
+  }, [bookmarks, highlights]);
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleVerses = useMemo(() => {
+    const base = mode === 'all'
+      ? savedItems
+      : mode === 'bookmarks'
+        ? bookmarks.map((verse): SavedVerseItem => ({ ...verse, savedKind: 'bookmark' }))
+        : highlights.map((verse): SavedVerseItem => ({ ...verse, savedKind: 'highlight', color: verse.color }));
+
+    if (!normalizedSearch) return base;
+
+    return base.filter((verse) => [
+      getSavedReference(verse),
+      verse.reference,
+      verse.text,
+      verse.savedKind,
+    ].join(' ').toLowerCase().includes(normalizedSearch));
+  }, [bookmarks, highlights, mode, normalizedSearch, savedItems]);
 
   const persistActivity = async (nextActivity: BibleActivityState) => {
     setActivity(nextActivity);
@@ -76,27 +108,46 @@ export default function SavedBibleScreen() {
         </View>
       </View>
 
-      <View style={styles.segmentedControl}>
-        <SegmentButton label="Bookmarks" selected={mode === 'bookmarks'} onPress={() => setMode('bookmarks')} />
-        <SegmentButton label="Highlights" selected={mode === 'highlights'} onPress={() => setMode('highlights')} />
+      <View style={[styles.searchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={17} color={theme.colors.textMuted} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search saved Scripture"
+            placeholderTextColor={theme.colors.textMuted}
+            style={[styles.searchInput, { color: theme.colors.text }]}
+            accessibilityLabel="Search saved Scripture"
+            returnKeyType="search"
+          />
+          {searchQuery ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Clear saved Scripture search" hitSlop={10} onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={17} color={theme.colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+        <View style={styles.filtersRow}>
+          <Chip label="All" selected={mode === 'all'} onPress={() => setMode('all')} />
+          <Chip label="Bookmarks" selected={mode === 'bookmarks'} onPress={() => setMode('bookmarks')} />
+          <Chip label="Highlights" selected={mode === 'highlights'} onPress={() => setMode('highlights')} />
+        </View>
       </View>
 
       {visibleVerses.length > 0 ? (
         <View style={styles.list}>
           {visibleVerses.map((verse) => {
-            const book = scriptureService.getBook(verse.bookId);
-            const reference = book ? `${book.name} ${verse.chapter}:${verse.verse}` : verse.reference;
+            const reference = getSavedReference(verse);
             return (
-              <View key={`${mode}-${verse.reference}`} style={[styles.savedRow, { borderColor: theme.colors.rule }]}>
+              <View key={`${verse.savedKind}-${verse.reference}`} style={[styles.savedRow, { borderColor: theme.colors.rule }]}>
                 <Pressable accessibilityRole="button" onPress={() => openVerse(verse)} style={styles.savedCopy}>
-                  <EditorialLabel>{reference}</EditorialLabel>
+                  <EditorialLabel>{verse.savedKind === 'bookmark' ? 'BOOKMARK' : 'HIGHLIGHT'} · {reference}</EditorialLabel>
                   <Text variant="headingSerif" style={styles.savedText} numberOfLines={4}>
                     {verse.text}
                   </Text>
                 </Pressable>
                 <View style={styles.rowActions}>
                   <Button title="Open chapter" variant="secondary" onPress={() => openVerse(verse)} />
-                  {mode === 'bookmarks' ? (
+                  {verse.savedKind === 'bookmark' ? (
                     <Button title="Unsave" variant="ghost" onPress={() => removeBookmark(verse)} />
                   ) : (
                     <Button title="Unhighlight" variant="ghost" onPress={() => removeHighlight(verse as BibleHighlightedVerse)} />
@@ -108,37 +159,14 @@ export default function SavedBibleScreen() {
         </View>
       ) : (
         <View style={[styles.emptyState, { borderColor: theme.colors.rule }]}>
-          <Text variant="headingSerif">{mode === 'bookmarks' ? 'No bookmarks yet.' : 'No highlights yet.'}</Text>
+          <Text variant="headingSerif">{bookmarks.length || highlights.length ? 'Nothing matched.' : 'No saved Scripture yet.'}</Text>
           <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-            Open a chapter, tap a verse, then save or highlight it here.
+            {bookmarks.length || highlights.length ? 'Try a different word or filter.' : 'Open a chapter, tap a verse, then save or highlight it here.'}
           </Text>
           <Button title="Browse Bible" variant="secondary" onPress={() => router.push('/(tabs)/bible')} />
         </View>
       )}
     </Screen>
-  );
-}
-
-function SegmentButton({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  const theme = useAppTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.segmentButton,
-        {
-          backgroundColor: selected ? theme.colors.accentSoft : 'transparent',
-          borderColor: selected ? theme.colors.accent : theme.colors.rule,
-          opacity: pressed ? 0.84 : 1,
-        },
-      ]}
-    >
-      <Text variant="bodySmall" style={{ color: selected ? theme.colors.accent : theme.colors.textSecondary }}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -157,18 +185,28 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3,
   },
-  segmentedControl: {
+  searchBlock: {
+    borderWidth: 1,
+    borderRadius: 12,
+    gap: 12,
+    padding: 14,
+  },
+  searchRow: {
+    minHeight: 36,
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
-  segmentButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
+  searchInput: {
     flex: 1,
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 12,
+    padding: 0,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   list: {
     gap: 16,
