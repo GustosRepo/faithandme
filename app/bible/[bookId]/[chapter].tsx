@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -54,6 +55,7 @@ export default function BibleChapterScreen() {
   const previous = chapter.chapter > 1 ? chapter.chapter - 1 : null;
   const next = chapter.chapter < book.chapterCount ? chapter.chapter + 1 : null;
   const openChapter = (number: number) => router.replace({ pathname: '/bible/[bookId]/[chapter]', params: { bookId: book.id, chapter: String(number) } });
+  const openChapterList = () => router.push({ pathname: '/bible/[bookId]', params: { bookId: book.id } });
   const selectedVerse = selectedReference ? chapter.verses.find((verse) => verse.reference === selectedReference) : null;
   const chapterComplete = Boolean(activity.completedChapters[book.id]?.includes(chapter.chapter));
   const readerFont = useMemo(() => getReaderFont(activity.readerSettings.fontFamily), [activity.readerSettings.fontFamily]);
@@ -98,6 +100,17 @@ export default function BibleChapterScreen() {
   return (
     <Screen background="plain" contentContainerStyle={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Back to ${book.name} chapters`}
+        onPress={openChapterList}
+        style={({ pressed }) => [styles.backLink, { opacity: pressed ? 0.7 : 1 }]}
+      >
+        <View style={[styles.backIcon, { backgroundColor: theme.colors.surfaceSecondary }]}>
+          <Ionicons name="chevron-back" size={18} color={theme.colors.textSecondary} />
+        </View>
+        <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Back to chapters</Text>
+      </Pressable>
       <EditorialLabel>Berean Standard Bible · BSB</EditorialLabel>
       <Text variant="displaySerif" style={styles.bookTitle}>{book.name}</Text>
       <Text variant="headingSerif" style={{ color: theme.colors.textSecondary }}>Chapter {chapter.chapter}</Text>
@@ -231,6 +244,20 @@ function ToolPill({ label, onPress, selected = false }: { label: string; onPress
 
 const styles = StyleSheet.create({
   container: { gap: 14, paddingHorizontal: 26 },
+  backLink: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 40,
+  },
+  backIcon: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
   bookTitle: { marginTop: 6 },
   progressPanel: {
     gap: 9,
