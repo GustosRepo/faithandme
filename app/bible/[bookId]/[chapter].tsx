@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage } from '@/context/LanguageContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
-import { scriptureService } from '@/services/scripture/ScriptureService';
+import { getScriptureService } from '@/services/scripture/ScriptureService';
 import type { BibleVerse } from '@/services/scripture/types';
 import {
   defaultBibleActivityState,
@@ -33,8 +34,11 @@ function getReaderFont(fontFamily: 'serif' | 'sans') {
 export default function BibleChapterScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { language, t } = useLanguage();
   const { bookId, chapter: chapterParam } = useLocalSearchParams<{ bookId: string; chapter: string }>();
   const chapterNumber = Number(chapterParam);
+  const scriptureService = getScriptureService(language);
+  const metadata = scriptureService.getBibleMetadata();
   const book = scriptureService.getBook(bookId ?? '');
   const chapter = scriptureService.getChapter(bookId ?? '', chapterNumber);
   const [activity, setActivity] = useState<BibleActivityState>(defaultBibleActivityState);
@@ -51,7 +55,7 @@ export default function BibleChapterScreen() {
     });
   }, [book, chapter]);
 
-  if (!book || !chapter) return <Screen background="plain"><Text variant="heading">Chapter unavailable.</Text></Screen>;
+  if (!book || !chapter) return <Screen background="plain"><Text variant="heading">{t('bible.chapterUnavailable')}</Text></Screen>;
   const previous = chapter.chapter > 1 ? chapter.chapter - 1 : null;
   const next = chapter.chapter < book.chapterCount ? chapter.chapter + 1 : null;
   const openChapter = (number: number) => router.replace({ pathname: '/bible/[bookId]/[chapter]', params: { bookId: book.id, chapter: String(number) } });
@@ -102,23 +106,23 @@ export default function BibleChapterScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Back to ${book.name} chapters`}
+        accessibilityLabel={t('bible.backToBookChapters', { book: book.name })}
         onPress={openChapterList}
         style={({ pressed }) => [styles.backLink, { opacity: pressed ? 0.7 : 1 }]}
       >
         <View style={[styles.backIcon, { backgroundColor: theme.colors.surfaceSecondary }]}>
           <Ionicons name="chevron-back" size={18} color={theme.colors.textSecondary} />
         </View>
-        <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Back to chapters</Text>
+        <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{t('bible.backToChapters')}</Text>
       </Pressable>
-      <EditorialLabel>Berean Standard Bible · BSB</EditorialLabel>
+      <EditorialLabel>{metadata.name} · {metadata.abbreviation}</EditorialLabel>
       <Text variant="displaySerif" style={styles.bookTitle}>{book.name}</Text>
-      <Text variant="headingSerif" style={{ color: theme.colors.textSecondary }}>Chapter {chapter.chapter}</Text>
+      <Text variant="headingSerif" style={{ color: theme.colors.textSecondary }}>{t('bible.chapter', { chapter: chapter.chapter })}</Text>
 
       <View style={[styles.progressPanel, { borderColor: theme.colors.rule }]}>
         <View style={styles.progressHeader}>
           <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
-            {completedInBook} of {book.chapterCount} chapters read
+            {t('bible.chapterProgressNoPeriod', { completed: completedInBook, total: book.chapterCount })}
           </Text>
           <Text variant="caption" style={{ color: theme.colors.textMuted }}>
             {Math.round(bookProgress * 100)}%
@@ -128,8 +132,8 @@ export default function BibleChapterScreen() {
           <View style={[styles.readerProgressFill, { width: `${Math.min(Math.max(bookProgress, 0), 1) * 100}%`, backgroundColor: theme.colors.accent }]} />
         </View>
         <View style={styles.chapterStats}>
-          <Text variant="caption" style={{ color: theme.colors.textMuted }}>{highlightedInChapter} highlighted</Text>
-          <Text variant="caption" style={{ color: theme.colors.textMuted }}>{savedInChapter} bookmarked</Text>
+          <Text variant="caption" style={{ color: theme.colors.textMuted }}>{t('bible.highlighted', { count: highlightedInChapter })}</Text>
+          <Text variant="caption" style={{ color: theme.colors.textMuted }}>{t('bible.bookmarked', { count: savedInChapter })}</Text>
         </View>
       </View>
 
@@ -152,12 +156,12 @@ export default function BibleChapterScreen() {
           </View>
           <View style={styles.selectionActions}>
             <Button
-              title={activity.highlights[selectedVerse.reference] ? 'Unhighlight' : 'Highlight'}
+              title={activity.highlights[selectedVerse.reference] ? t('bible.unhighlight') : t('bible.highlight')}
               variant="secondary"
               onPress={handleHighlight}
             />
             <Button
-              title={activity.bookmarks[selectedVerse.reference] ? 'Unsave' : 'Bookmark'}
+              title={activity.bookmarks[selectedVerse.reference] ? t('bible.unsave') : t('bible.bookmark')}
               variant="secondary"
               onPress={handleBookmark}
             />
@@ -200,21 +204,21 @@ export default function BibleChapterScreen() {
               {verse.text}
             </Text>
             {activity.bookmarks[verse.reference] ? (
-              <Text variant="caption" style={[styles.savedLabel, { color: theme.colors.accent }]}>Bookmarked</Text>
+              <Text variant="caption" style={[styles.savedLabel, { color: theme.colors.accent }]}>{t('bible.bookmarkedLabel')}</Text>
             ) : null}
           </Pressable>
         ))}
       </View>
       <Button
-        title={chapterComplete ? 'Chapter marked read' : 'Mark chapter read'}
+        title={chapterComplete ? t('bible.chapterMarked') : t('bible.markChapter')}
         variant={chapterComplete ? 'secondary' : 'primary'}
         onPress={handleMarkComplete}
       />
       <View style={styles.navigation}>
-        <Button title="Previous Chapter" variant="secondary" disabled={!previous} onPress={() => previous && openChapter(previous)} />
-        <Button title="Next Chapter" disabled={!next} onPress={() => next && openChapter(next)} />
+        <Button title={t('bible.previousChapter')} variant="secondary" disabled={!previous} onPress={() => previous && openChapter(previous)} />
+        <Button title={t('bible.nextChapter')} disabled={!next} onPress={() => next && openChapter(next)} />
       </View>
-      <Text variant="caption" style={[styles.about, { color: theme.colors.textMuted }]}>Berean Standard Bible (BSB). Dedicated to the public domain at berean.bible.</Text>
+      <Text variant="caption" style={[styles.about, { color: theme.colors.textMuted }]}>{t('bible.about', { translation: metadata.name, abbreviation: metadata.abbreviation })}</Text>
     </Screen>
   );
 }

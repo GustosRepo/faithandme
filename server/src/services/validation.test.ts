@@ -6,6 +6,7 @@ import { sanitizeModelResponse, validateTotalPassageTextLength } from './validat
 test('validateTotalPassageTextLength rejects oversized scripture context', () => {
   assert.equal(validateTotalPassageTextLength({
     question: 'Why am I anxious about everything?',
+    language: 'en',
     passages: [
       { reference: 'PHP.4.6-7', displayReference: 'Philippians 4:6-7', text: 'x'.repeat(3601) },
     ],

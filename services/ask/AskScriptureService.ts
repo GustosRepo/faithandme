@@ -1,8 +1,9 @@
 import { askScriptureConfig } from '@/services/ask/config';
 import { retrieveRelevantScripture } from '@/services/ask/scriptureRetrieval';
 import { getOrCreateClientId } from '@/services/identity/AnonymousClientId';
-import { scriptureService } from '@/services/scripture/ScriptureService';
+import { getScriptureService } from '@/services/scripture/ScriptureService';
 import type { ScripturePassage } from '@/services/scripture/types';
+import type { AppLanguage } from '@/context/LanguageContext';
 
 import type { AskScriptureApiResponse, AskScripturePassagePayload, AskScriptureResult, AskScriptureUsage } from './types';
 import { AskScriptureError } from './types';
@@ -33,8 +34,10 @@ function validateAndResolveResponse(
   response: AskScriptureApiResponse,
   retrievedPassages: ScripturePassage[],
   question: string,
+  language: AppLanguage,
 ): AskScriptureResult {
   const allowed = new Set(retrievedPassages.map((passage) => passage.reference.toUpperCase()));
+  const scriptureService = getScriptureService(language);
   const scriptures = response.answer.scriptures
     .filter((scripture) => allowed.has(scripture.reference.toUpperCase()))
     .map((scripture) => {
@@ -115,14 +118,14 @@ export async function getAskScriptureUsage(): Promise<AskScriptureUsage> {
   return response.json() as Promise<AskScriptureUsage>;
 }
 
-export async function askScripture(question: string): Promise<AskScriptureResult> {
+export async function askScripture(question: string, language: AppLanguage = 'en'): Promise<AskScriptureResult> {
   const trimmedQuestion = validateQuestion(question);
 
   if (!askScriptureConfig.apiBaseUrl) {
     throw new AskScriptureError('missing_api_url', 'Ask Scripture needs a Faith & Me API URL before it can respond.');
   }
 
-  const retrievedPassages = retrieveRelevantScripture(trimmedQuestion, askScriptureConfig.maxPassages);
+  const retrievedPassages = retrieveRelevantScripture(trimmedQuestion, askScriptureConfig.maxPassages, language);
 
   if (!retrievedPassages.length) {
     throw new AskScriptureError('server', 'Something went wrong while preparing your response.');
@@ -137,6 +140,7 @@ export async function askScripture(question: string): Promise<AskScriptureResult
       headers: { 'Content-Type': 'application/json', 'X-Faith-Client-Id': clientId },
       body: JSON.stringify({
         question: trimmedQuestion,
+        language,
         passages: toPayload(retrievedPassages),
       }),
     });
@@ -153,5 +157,5 @@ export async function askScripture(question: string): Promise<AskScriptureResult
   }
 
   const data = await response.json() as AskScriptureApiResponse;
-  return validateAndResolveResponse(data, retrievedPassages, trimmedQuestion);
+  return validateAndResolveResponse(data, retrievedPassages, trimmedQuestion, language);
 }

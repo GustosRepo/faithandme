@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
@@ -36,20 +37,32 @@ function deriveFocusChips(state: ReturnType<typeof useOnboarding>['state']): str
   return Array.from(new Set(combined)).slice(0, 3);
 }
 
+const focusLabelKeys: Record<string, TranslationKey> = {
+  Faith: 'topics.faith',
+  Peace: 'topics.peace',
+  Guidance: 'topics.guidance',
+  Strength: 'topics.strength',
+  Hope: 'topics.hope',
+  Love: 'topics.love',
+  Courage: 'topics.courage',
+  Forgiveness: 'topics.forgiveness',
+};
+
 export default function ReadyScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { t } = useLanguage();
   const { completeOnboarding, state } = useOnboarding();
   const focusChips = deriveFocusChips(state);
 
   const summary =
     state.situations.includes('Anxiety')
-      ? "We'll help you make space for peace, Scripture, and reflection each day."
+      ? t('onboarding.ready.summary.anxiety')
       : state.situations.includes('Purpose')
-        ? "We'll help you make space for guidance, Scripture, and intentional reflection."
+        ? t('onboarding.ready.summary.purpose')
         : state.goals.includes('Find peace')
-          ? "We'll help you make space for peace, Scripture, and steady hope."
-          : "We'll help you make space for Scripture, prayer, and reflection each day.";
+          ? t('onboarding.ready.summary.peace')
+          : t('onboarding.ready.summary.default');
 
   const handleStart = () => {
     completeOnboarding();
@@ -58,29 +71,29 @@ export default function ReadyScreen() {
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <EditorialLabel>Step 6 of 6</EditorialLabel>
-      <Text variant="displaySerif">Faith & Me is ready for you.</Text>
+      <EditorialLabel>{t('onboarding.step', { current: 6, total: 6 })}</EditorialLabel>
+      <Text variant="displaySerif">{t('onboarding.ready.title')}</Text>
       <Text variant="body" style={styles.subtleText}>{summary}</Text>
 
       <View style={styles.focusBlock}>
-        <EditorialLabel>Your Focus</EditorialLabel>
+        <EditorialLabel>{t('onboarding.ready.focus')}</EditorialLabel>
         <View style={styles.chipRow}>
           {focusChips.length > 0 ? (
             focusChips.map((chip) => (
               <View key={chip} style={[styles.focusChip, { borderColor: theme.colors.rule }]}>
-                <Text variant="bodySmall">{chip}</Text>
+                <Text variant="bodySmall">{t(focusLabelKeys[chip])}</Text>
               </View>
             ))
           ) : (
             <View style={[styles.focusChip, { borderColor: theme.colors.rule }]}>
-              <Text variant="bodySmall">Peace</Text>
+              <Text variant="bodySmall">{t('topics.peace')}</Text>
             </View>
           )}
         </View>
       </View>
 
       <View style={styles.footer}>
-        <Button title="Start my journey" onPress={handleStart} />
+        <Button title={t('onboarding.ready.start')} onPress={handleStart} />
       </View>
     </Screen>
   );

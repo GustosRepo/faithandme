@@ -1,22 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useLanguage } from '@/context/LanguageContext';
 import { useOnboarding } from '@/context/OnboardingContext';
+import { localizeDailySession } from '@/data/dailySessions';
 import { clearDailySessionState, clearDailyStreakState, createInitialDailySessionProgress, defaultDailyStreakState, loadDailySessionState, loadDailyStreakState, saveDailySessionState, saveDailyStreakState } from '@/storage/dailySession';
 import { DAILY_SESSION_STAGE_ORDER, type DailySessionProgress, type DailySessionStage, type DailyStreakState } from '@/types/dailySession';
 import { selectDailySessionForUser, updateDailyStreak } from '@/utils/dailySession';
 import { getLocalDateKey } from '@/utils/localDate';
 
 export function useDailySession() {
+  const { language } = useLanguage();
   const { state: onboardingState } = useOnboarding();
   const dateKey = getLocalDateKey();
 
-  const selectedSession = useMemo(
+  const selectedBaseSession = useMemo(
     () => selectDailySessionForUser({
       feeling: onboardingState.currentFeeling,
       situations: onboardingState.situations,
       goals: onboardingState.goals,
     }, dateKey),
     [dateKey, onboardingState.currentFeeling, onboardingState.goals, onboardingState.situations],
+  );
+
+  const selectedSession = useMemo(
+    () => localizeDailySession(selectedBaseSession, language),
+    [language, selectedBaseSession],
   );
 
   const [progress, setProgress] = useState<DailySessionProgress | null>(null);

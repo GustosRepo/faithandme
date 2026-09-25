@@ -10,4 +10,4 @@ The official terms state that the Berean Bible texts were dedicated to the publi
 
 The checked-in `data/bsb.json` was generated from the official USFM archive with `node scripts/import-bsb.mjs`. The importer removes USFM formatting and footnote markers while preserving the verse text and canonical reference coordinates. It does not generate or paraphrase Scripture.
 
-Validation is run with `node scripts/validate-bsb.mjs data/bsb.json` and checks the 66-book corpus, duplicate references, empty text, and malformed verse records.
+Validation is run with `node scripts/validate-scripture-dataset.mjs data/bsb.json` and checks the 66-book corpus, 1,189 chapters, duplicate references, empty text, and malformed verse records. The older `node scripts/validate-bsb.mjs data/bsb.json` remains available for the BSB-specific fixture checks.

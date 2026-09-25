@@ -64,6 +64,9 @@ function buildPrompt(request: AskScriptureRequest, safetyLevel: SafetyLevel) {
     displayReference: passage.displayReference,
     text: passage.text,
   }));
+  const responseLanguageInstruction = request.language === 'es'
+    ? 'Write every user-facing field in natural, warm Latin American Spanish. Keep Scripture reference ids unchanged. Do not translate or quote Scripture text; the app displays canonical Bible text locally.'
+    : 'Write every user-facing field in natural, warm English.';
 
   return [
     {
@@ -77,6 +80,7 @@ function buildPrompt(request: AskScriptureRequest, safetyLevel: SafetyLevel) {
         'Distinguish Scripture from explanation and application.',
         'When interpretations vary among Christian traditions, avoid presenting one contested interpretation as universal.',
         'Keep the response compassionate, concise, and practical.',
+        responseLanguageInstruction,
         'Set safetyNote to an empty string unless immediate real-world safety guidance is needed.',
         safetyInstructionFor(safetyLevel),
       ].filter(Boolean).join(' '),
@@ -85,6 +89,7 @@ function buildPrompt(request: AskScriptureRequest, safetyLevel: SafetyLevel) {
       role: 'user' as const,
       content: JSON.stringify({
         question: request.question,
+        responseLanguage: request.language,
         suppliedPassages: passages,
       }),
     },

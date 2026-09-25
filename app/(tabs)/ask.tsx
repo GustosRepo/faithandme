@@ -5,6 +5,7 @@ import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { BrandMark } from '@/components/BrandMark';
 import { Button, Chip, Divider, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { askScripture, getAskScriptureUsage } from '@/services/ask/AskScriptureService';
 import { getAskTopicLabels } from '@/services/ask/scriptureRetrieval';
@@ -14,50 +15,59 @@ import { addJournalEntry } from '@/storage/journal';
 
 const MAX_QUESTION_LENGTH = 800;
 
-const suggestedQuestions: Record<string, string> = {
-  Anxiety: "I'm anxious about something I can't control.",
-  Forgiveness: "I'm angry with someone and don't know how to let it go.",
-  Relationships: 'My relationship has been difficult lately.',
-  Purpose: "I don't know what direction to take in life.",
-  Money: "I'm worried about money and how to handle it faithfully.",
-  Faith: "I'm struggling to trust God right now.",
+const topicLabelKeys: Record<string, TranslationKey> = {
+  Anxiety: 'topics.anxiety',
+  Forgiveness: 'topics.forgiveness',
+  Relationships: 'topics.relationships',
+  Purpose: 'topics.purpose',
+  Money: 'topics.money',
+  Faith: 'topics.faith',
+};
+
+const suggestedQuestionKeys: Record<string, TranslationKey> = {
+  Anxiety: 'ask.suggest.anxiety',
+  Forgiveness: 'ask.suggest.forgiveness',
+  Relationships: 'ask.suggest.relationships',
+  Purpose: 'ask.suggest.purpose',
+  Money: 'ask.suggest.money',
+  Faith: 'ask.suggest.faith',
 };
 
 const followUpActions = [
   {
-    label: 'Go deeper',
-    prompt: (result: AskScriptureResult) => `Go deeper on this answer to my question: "${result.question}". Help me understand what I may be missing and how to sit with this Scripture.`,
+    labelKey: 'ask.followUp.deep',
+    promptKey: 'ask.followPrompt.deep',
   },
   {
-    label: 'Explain context',
-    prompt: (result: AskScriptureResult) => `Explain the biblical context behind these passages from my question: "${result.question}". Keep it pastoral and easy to understand.`,
+    labelKey: 'ask.followUp.context',
+    promptKey: 'ask.followPrompt.context',
   },
   {
-    label: 'Turn into prayer',
-    prompt: (result: AskScriptureResult) => `Turn this answer into a personal prayer for me: "${result.question}".`,
+    labelKey: 'ask.followUp.prayer',
+    promptKey: 'ask.followPrompt.prayer',
   },
   {
-    label: '3-day plan',
-    prompt: (result: AskScriptureResult) => `Give me a simple 3-day Scripture reflection plan based on this question: "${result.question}".`,
+    labelKey: 'ask.followUp.plan',
+    promptKey: 'ask.followPrompt.plan',
   },
-] as const;
+] as const satisfies ReadonlyArray<{ labelKey: TranslationKey; promptKey: TranslationKey }>;
 
-function getErrorCopy(error: { code: AskScriptureErrorCode | 'unknown'; message: string }) {
+function getErrorCopy(error: { code: AskScriptureErrorCode | 'unknown'; message: string }, t: (key: TranslationKey) => string) {
   switch (error.code) {
     case 'daily_ask_limit':
       return {
-        title: "That's all for today.",
-        body: "You've used today's free Ask Scripture questions. Come back tomorrow for more.",
+        title: t('ask.error.dailyTitle'),
+        body: t('ask.error.dailyBody'),
         canRetry: false,
         showOfflineLinks: false,
       };
     case 'network':
     case 'missing_api_url':
       return {
-        title: error.code === 'missing_api_url' ? 'Ask Scripture needs setup.' : "Couldn't connect right now.",
+        title: error.code === 'missing_api_url' ? t('ask.error.setupTitle') : t('ask.error.networkTitle'),
         body: error.code === 'missing_api_url'
-          ? 'Ask Scripture needs a Faith & Me API connection before it can respond.'
-          : 'Check your connection and try again. You can still read the Bible or continue today\'s moment offline.',
+          ? t('ask.error.setupBody')
+          : t('ask.error.networkBody'),
         canRetry: error.code === 'network',
         showOfflineLinks: true,
       };
@@ -65,22 +75,22 @@ function getErrorCopy(error: { code: AskScriptureErrorCode | 'unknown'; message:
     case 'ask_scripture_disabled':
     case 'server':
       return {
-        title: 'Ask Scripture is taking a break.',
-        body: 'Your Bible, daily Scripture, and 5 Minutes With God are still available.',
+        title: t('ask.error.breakTitle'),
+        body: t('ask.error.breakBody'),
         canRetry: true,
         showOfflineLinks: true,
       };
     case 'ask_already_in_progress':
       return {
-        title: 'Still preparing your answer.',
-        body: 'Your previous question is still being prepared.',
+        title: t('ask.error.inProgressTitle'),
+        body: t('ask.error.inProgressBody'),
         canRetry: false,
         showOfflineLinks: false,
       };
     default:
       return {
-        title: 'Try that again?',
-        body: error.message,
+        title: t('ask.error.unknownTitle'),
+        body: error.message || t('ask.error.unknownBody'),
         canRetry: true,
         showOfflineLinks: false,
       };
@@ -90,12 +100,13 @@ function getErrorCopy(error: { code: AskScriptureErrorCode | 'unknown'; message:
 export default function AskScreen() {
   const theme = useAppTheme();
   const router = useRouter();
+  const { language, t } = useLanguage();
   const topics = getAskTopicLabels();
   const inputRef = useRef<TextInput>(null);
   const [question, setQuestion] = useState('');
   const [result, setResult] = useState<AskScriptureResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Finding relevant Scripture...');
+  const [loadingMessage, setLoadingMessage] = useState(t('ask.loading.finding'));
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<{ code: AskScriptureErrorCode | 'unknown'; message: string } | null>(null);
   const [usage, setUsage] = useState<AskScriptureUsage | null>(null);
@@ -124,10 +135,10 @@ export default function AskScreen() {
   useEffect(() => {
     if (!loading) return;
 
-    setLoadingMessage('Finding relevant Scripture...');
-    const timer = setTimeout(() => setLoadingMessage('Reflecting on these passages...'), 1800);
+    setLoadingMessage(t('ask.loading.finding'));
+    const timer = setTimeout(() => setLoadingMessage(t('ask.loading.reflecting')), 1800);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [loading, t]);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -139,7 +150,7 @@ export default function AskScreen() {
     setLoading(true);
 
     try {
-      const answer = await askScripture(question);
+      const answer = await askScripture(question, language);
       setResult(answer);
       setQuestion('');
       setUsage(answer.usage);
@@ -147,7 +158,7 @@ export default function AskScreen() {
       if (caught instanceof AskScriptureError) {
         setError({ code: caught.code, message: caught.message });
       } else {
-        setError({ code: 'unknown', message: 'Something went wrong while preparing your response.' });
+        setError({ code: 'unknown', message: t('ask.error.unknownBody') });
       }
     } finally {
       setLoading(false);
@@ -155,7 +166,8 @@ export default function AskScreen() {
   };
 
   const handleTopicPress = (topic: string) => {
-    setQuestion(suggestedQuestions[topic] ?? topic);
+    const promptKey = suggestedQuestionKeys[topic];
+    setQuestion(promptKey ? t(promptKey) : topic);
     setResult(null);
     setError(null);
     setSavedToJournal(false);
@@ -184,17 +196,17 @@ export default function AskScreen() {
 
       await addJournalEntry({
         kind: 'reflection',
-        title: 'Ask Scripture Reflection',
+        title: t('ask.saveTitle'),
         source: 'ask',
         content: [
-          `Question: ${result.question}`,
+          `${t('ask.saveQuestion')}: ${result.question}`,
           result.answer.summary,
-          scriptureLines ? `Scripture:\n${scriptureLines}` : '',
-          `Context:\n${result.answer.context}`,
-          `Application:\n${result.answer.application}`,
-          reflectionLines ? `Reflect:\n${reflectionLines}` : '',
-          `Prayer:\n${result.answer.prayer}`,
-          `Next step:\n${result.answer.nextStep}`,
+          scriptureLines ? `${t('ask.saveScripture')}:\n${scriptureLines}` : '',
+          `${t('ask.saveContext')}:\n${result.answer.context}`,
+          `${t('ask.saveApplication')}:\n${result.answer.application}`,
+          reflectionLines ? `${t('ask.saveReflect')}:\n${reflectionLines}` : '',
+          `${t('ask.savePrayer')}:\n${result.answer.prayer}`,
+          `${t('ask.saveNextStep')}:\n${result.answer.nextStep}`,
         ].filter(Boolean).join('\n\n'),
       });
       setSavedToJournal(true);
@@ -213,13 +225,13 @@ export default function AskScreen() {
 
   const exhausted = usage ? usage.remaining <= 0 : false;
   const normalizedQuestion = question.trim().replace(/\s+/g, ' ');
-  const hasMeaningfulContent = normalizedQuestion.length >= 8 && /[A-Za-z]/.test(normalizedQuestion);
+  const hasMeaningfulContent = normalizedQuestion.length >= 8 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(normalizedQuestion);
   const canSubmit = hasMeaningfulContent && !loading && !exhausted && !result;
   const usageLabel = usage
-    ? `${usage.remaining} question${usage.remaining === 1 ? '' : 's'} available today`
-    : 'Ask Scripture usage will update when connected.';
+    ? t(usage.remaining === 1 ? 'ask.usage.one' : 'ask.usage.other', { count: usage.remaining })
+    : t('ask.usage.offline');
   const showCharacterCount = question.length > 0;
-  const errorCopy = error ? getErrorCopy(error) : null;
+  const errorCopy = error ? getErrorCopy(error, t) : null;
 
   return (
     <Screen
@@ -234,12 +246,12 @@ export default function AskScreen() {
         <>
           <View style={styles.hero}>
             <BrandMark size="small" />
-            <Text variant="display">Ask Scripture</Text>
+            <Text variant="display">{t('ask.title')}</Text>
             <Text variant="headingSerif" style={styles.heartHeading}>
-              What&apos;s on your heart?
+              {t('ask.heart')}
             </Text>
             <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-              Ask about Scripture, faith, or something you&apos;re going through.
+              {t('ask.subtitle')}
             </Text>
           </View>
 
@@ -249,9 +261,9 @@ export default function AskScreen() {
 
           {exhausted ? (
             <View style={[styles.notice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surface }]}>
-              <Text variant="subheading">You&apos;ve used today&apos;s free questions.</Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>Come back tomorrow for more.</Text>
-              <Button title="View upgrade" variant="secondary" onPress={() => router.push('/upgrade')} />
+              <Text variant="subheading">{t('ask.exhaustedTitle')}</Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{t('ask.exhaustedBody')}</Text>
+              <Button title={t('ask.viewUpgrade')} variant="secondary" onPress={() => router.push('/upgrade')} />
             </View>
           ) : null}
 
@@ -271,13 +283,13 @@ export default function AskScreen() {
               onChangeText={setQuestion}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              placeholder="I'm struggling with..."
+              placeholder={t('ask.placeholder')}
               placeholderTextColor={theme.colors.textMuted}
               style={[styles.input, { color: theme.colors.text }]}
               maxLength={MAX_QUESTION_LENGTH}
               textAlignVertical="top"
               editable={!loading && !exhausted}
-              accessibilityLabel="Ask Scripture question"
+              accessibilityLabel={t('ask.inputLabel')}
               returnKeyType="default"
             />
 
@@ -287,7 +299,7 @@ export default function AskScreen() {
               </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Send question"
+                accessibilityLabel={t('ask.sendLabel')}
                 accessibilityState={{ disabled: !canSubmit || loading }}
                 disabled={!canSubmit}
                 onPress={handleSubmit}
@@ -306,11 +318,11 @@ export default function AskScreen() {
 
           <View style={styles.suggestionsBlock}>
             <Text variant="caption" style={{ color: theme.colors.textMuted }}>
-              People often ask
+              {t('ask.peopleAsk')}
             </Text>
             <View style={styles.suggestionsRow}>
               {topics.map((topic) => (
-                <Chip key={topic} label={topic} onPress={() => handleTopicPress(topic)} />
+                <Chip key={topic} label={topicLabelKeys[topic] ? t(topicLabelKeys[topic]) : topic} onPress={() => handleTopicPress(topic)} />
               ))}
             </View>
           </View>
@@ -320,14 +332,14 @@ export default function AskScreen() {
               <Text variant="subheading">{errorCopy.title}</Text>
               <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{errorCopy.body}</Text>
               <View style={styles.noticeActions}>
-                {errorCopy.canRetry ? <Button title="Try again" variant="secondary" onPress={handleSubmit} disabled={!hasMeaningfulContent || loading || exhausted} /> : null}
+                {errorCopy.canRetry ? <Button title={t('ask.tryAgain')} variant="secondary" onPress={handleSubmit} disabled={!hasMeaningfulContent || loading || exhausted} /> : null}
                 {errorCopy.showOfflineLinks ? (
                   <>
-                    <Button title="Read the Bible" variant="ghost" onPress={() => router.push('/(tabs)/bible')} />
-                    <Button title={"Today's Moment"} variant="ghost" onPress={() => router.push('/(tabs)')} />
+                    <Button title={t('ask.readBible')} variant="ghost" onPress={() => router.push('/(tabs)/bible')} />
+                    <Button title={t('ask.todaysMoment')} variant="ghost" onPress={() => router.push('/(tabs)')} />
                   </>
                 ) : null}
-                {error?.code === 'daily_ask_limit' ? <Button title="View upgrade" variant="ghost" onPress={() => router.push('/upgrade')} /> : null}
+                {error?.code === 'daily_ask_limit' ? <Button title={t('ask.viewUpgrade')} variant="ghost" onPress={() => router.push('/upgrade')} /> : null}
               </View>
             </View>
           ) : null}
@@ -342,8 +354,8 @@ export default function AskScreen() {
       ) : (
         <View style={styles.answerWrap}>
           <View style={styles.answerHeader}>
-            <EditorialLabel>Ask Scripture</EditorialLabel>
-            <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>You asked</Text>
+            <EditorialLabel>{t('ask.title')}</EditorialLabel>
+            <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>{t('ask.youAsked')}</Text>
             <Text variant="body" style={[styles.quotedQuestion, { color: theme.colors.textSecondary }]}>
               &quot;{result.question}&quot;
             </Text>
@@ -351,7 +363,7 @@ export default function AskScreen() {
 
           {result.answer.safetyNote ? (
             <View style={[styles.safetyNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surface }]}>
-              <EditorialLabel>Safety</EditorialLabel>
+              <EditorialLabel>{t('ask.safety')}</EditorialLabel>
               <Text variant="body" style={{ color: theme.colors.textSecondary }}>{result.answer.safetyNote}</Text>
             </View>
           ) : null}
@@ -363,33 +375,33 @@ export default function AskScreen() {
           </View>
 
           <View style={styles.section}>
-            <EditorialLabel>Scripture</EditorialLabel>
+            <EditorialLabel>{t('ask.scripture')}</EditorialLabel>
             {result.scriptures.map((scripture, index) => (
               <View key={scripture.reference} style={[styles.scriptureBlock, { borderLeftColor: theme.colors.accent }]}>
                 {index > 0 ? <Divider /> : null}
                 <Text variant="subheading" style={{ color: theme.colors.accent }}>{scripture.passage.displayReference}</Text>
                 <Text variant="scripture" style={styles.scriptureText}>&quot;{scripture.passage.text}&quot;</Text>
                 <Text variant="scriptureReference" style={{ color: theme.colors.textSecondary }}>
-                  BSB
+                  {scripture.passage.translation}
                 </Text>
-                <Text variant="bodySmall" style={{ color: theme.colors.accent, marginTop: 10 }}>Why this matters</Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.accent, marginTop: 10 }}>{t('ask.whyMatters')}</Text>
                 <Text variant="body" style={styles.answerText}>{scripture.reason}</Text>
               </View>
             ))}
           </View>
 
           <View style={styles.section}>
-            <EditorialLabel>Context</EditorialLabel>
+            <EditorialLabel>{t('ask.context')}</EditorialLabel>
             <Text variant="body" style={styles.answerText}>{result.answer.context}</Text>
           </View>
 
           <View style={styles.section}>
-            <EditorialLabel>What This Could Mean For You</EditorialLabel>
+            <EditorialLabel>{t('ask.meaning')}</EditorialLabel>
             <Text variant="body" style={styles.answerText}>{result.answer.application}</Text>
           </View>
 
           <View style={styles.section}>
-            <EditorialLabel>Reflect</EditorialLabel>
+            <EditorialLabel>{t('ask.reflect')}</EditorialLabel>
             {result.answer.reflectionQuestions.map((reflectionQuestion, index) => (
               <View key={reflectionQuestion} style={styles.reflectionRow}>
                 <Text variant="caption" style={{ color: theme.colors.accent }}>{String(index + 1).padStart(2, '0')}</Text>
@@ -399,37 +411,41 @@ export default function AskScreen() {
           </View>
 
           <View style={styles.section}>
-            <EditorialLabel>Prayer</EditorialLabel>
-            <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>If it&apos;s helpful, you might pray:</Text>
+            <EditorialLabel>{t('ask.prayer')}</EditorialLabel>
+            <Text variant="bodySmall" style={{ color: theme.colors.textMuted }}>{t('ask.prayerIntro')}</Text>
             <Text variant="body" style={[styles.answerText, styles.prayerText, { color: theme.colors.textSecondary }]}>{result.answer.prayer}</Text>
           </View>
 
           <View style={[styles.nextStepBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.accentSoft }]}>
-            <EditorialLabel>One Small Step</EditorialLabel>
+            <EditorialLabel>{t('ask.nextStep')}</EditorialLabel>
             <Text variant="body" style={styles.answerText}>{result.answer.nextStep}</Text>
           </View>
 
           <View style={styles.section}>
-            <EditorialLabel>Follow up</EditorialLabel>
+            <EditorialLabel>{t('ask.followUp')}</EditorialLabel>
             <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
-              Use this answer as a starting point for a deeper question.
+              {t('ask.followUpBody')}
             </Text>
             <View style={styles.followUpRow}>
               {followUpActions.map((action) => (
-                <Chip key={action.label} label={action.label} onPress={() => handleFollowUp(action.prompt(result))} />
+                <Chip
+                  key={action.labelKey}
+                  label={t(action.labelKey)}
+                  onPress={() => handleFollowUp(t(action.promptKey, { question: result.question }))}
+                />
               ))}
             </View>
           </View>
 
           <View style={styles.answerActions}>
             <Button
-              title={savedToJournal ? 'Saved to Journal' : savingToJournal ? 'Saving...' : 'Save to Journal'}
+              title={savedToJournal ? t('ask.saved') : savingToJournal ? t('ask.saving') : t('ask.save')}
               variant={savedToJournal ? 'secondary' : 'primary'}
               disabled={savingToJournal || savedToJournal}
               onPress={handleSaveToJournal}
             />
-            {savedToJournal ? <Button title="Open Journal" variant="ghost" onPress={() => router.push('/(tabs)/journal')} /> : null}
-            <Button title="Ask something else" variant="secondary" onPress={handleReset} />
+            {savedToJournal ? <Button title={t('ask.openJournal')} variant="ghost" onPress={() => router.push('/(tabs)/journal')} /> : null}
+            <Button title={t('ask.askElse')} variant="secondary" onPress={handleReset} />
           </View>
         </View>
       )}

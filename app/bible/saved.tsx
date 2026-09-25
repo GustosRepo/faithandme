@@ -4,8 +4,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button, Chip, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage } from '@/context/LanguageContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
-import { scriptureService } from '@/services/scripture/ScriptureService';
+import { getScriptureService } from '@/services/scripture/ScriptureService';
+import type { ScriptureProvider } from '@/services/scripture/types';
 import {
   defaultBibleActivityState,
   loadBibleActivityState,
@@ -27,14 +29,20 @@ function sortSavedVerses<T extends BibleSavedVerse>(verses: T[]): T[] {
   return [...verses].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
-function getSavedReference(verse: BibleSavedVerse) {
+function getSavedReference(verse: BibleSavedVerse, scriptureService: ScriptureProvider) {
   const book = scriptureService.getBook(verse.bookId);
   return book ? `${book.name} ${verse.chapter}:${verse.verse}` : verse.reference;
+}
+
+function getSavedText(verse: BibleSavedVerse, scriptureService: ScriptureProvider) {
+  return scriptureService.getVerse(verse.reference)?.text ?? verse.text;
 }
 
 export default function SavedBibleScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { language, t } = useLanguage();
+  const scriptureService = getScriptureService(language);
   const [mode, setMode] = useState<SavedMode>('all');
   const [activity, setActivity] = useState<BibleActivityState>(defaultBibleActivityState);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,12 +71,12 @@ export default function SavedBibleScreen() {
     if (!normalizedSearch) return base;
 
     return base.filter((verse) => [
-      getSavedReference(verse),
+      getSavedReference(verse, scriptureService),
       verse.reference,
-      verse.text,
+      getSavedText(verse, scriptureService),
       verse.savedKind,
     ].join(' ').toLowerCase().includes(normalizedSearch));
-  }, [bookmarks, highlights, mode, normalizedSearch, savedItems]);
+  }, [bookmarks, highlights, mode, normalizedSearch, savedItems, scriptureService]);
 
   const persistActivity = async (nextActivity: BibleActivityState) => {
     setActivity(nextActivity);
@@ -90,21 +98,21 @@ export default function SavedBibleScreen() {
   return (
     <Screen contentContainerStyle={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <EditorialLabel>Bible Library</EditorialLabel>
-      <Text variant="displaySerif">Saved Scripture</Text>
+      <EditorialLabel>{t('savedBible.label')}</EditorialLabel>
+      <Text variant="displaySerif">{t('savedBible.title')}</Text>
       <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-        Keep verses close while you read. Everything here stays on this device.
+        {t('savedBible.subtitle')}
       </Text>
-      <Button title="Back to Bible" variant="secondary" onPress={() => router.push('/(tabs)/bible')} />
+      <Button title={t('savedBible.back')} variant="secondary" onPress={() => router.push('/(tabs)/bible')} />
 
       <View style={[styles.summary, { borderColor: theme.colors.rule }]}>
         <View style={styles.summaryItem}>
           <Text variant="headingSerif">{bookmarks.length}</Text>
-          <Text variant="caption" style={{ color: theme.colors.textMuted }}>Bookmarks</Text>
+          <Text variant="caption" style={{ color: theme.colors.textMuted }}>{t('bible.bookmarks')}</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text variant="headingSerif">{highlights.length}</Text>
-          <Text variant="caption" style={{ color: theme.colors.textMuted }}>Highlights</Text>
+          <Text variant="caption" style={{ color: theme.colors.textMuted }}>{t('bible.highlights')}</Text>
         </View>
       </View>
 
@@ -114,43 +122,44 @@ export default function SavedBibleScreen() {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search saved Scripture"
+            placeholder={t('savedBible.search')}
             placeholderTextColor={theme.colors.textMuted}
             style={[styles.searchInput, { color: theme.colors.text }]}
-            accessibilityLabel="Search saved Scripture"
+            accessibilityLabel={t('savedBible.searchLabel')}
             returnKeyType="search"
           />
           {searchQuery ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Clear saved Scripture search" hitSlop={10} onPress={() => setSearchQuery('')}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('savedBible.clearSearch')} hitSlop={10} onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={17} color={theme.colors.textMuted} />
             </Pressable>
           ) : null}
         </View>
         <View style={styles.filtersRow}>
-          <Chip label="All" selected={mode === 'all'} onPress={() => setMode('all')} />
-          <Chip label="Bookmarks" selected={mode === 'bookmarks'} onPress={() => setMode('bookmarks')} />
-          <Chip label="Highlights" selected={mode === 'highlights'} onPress={() => setMode('highlights')} />
+          <Chip label={t('savedBible.all')} selected={mode === 'all'} onPress={() => setMode('all')} />
+          <Chip label={t('bible.bookmarks')} selected={mode === 'bookmarks'} onPress={() => setMode('bookmarks')} />
+          <Chip label={t('bible.highlights')} selected={mode === 'highlights'} onPress={() => setMode('highlights')} />
         </View>
       </View>
 
       {visibleVerses.length > 0 ? (
         <View style={styles.list}>
           {visibleVerses.map((verse) => {
-            const reference = getSavedReference(verse);
+            const reference = getSavedReference(verse, scriptureService);
+            const text = getSavedText(verse, scriptureService);
             return (
               <View key={`${verse.savedKind}-${verse.reference}`} style={[styles.savedRow, { borderColor: theme.colors.rule }]}>
                 <Pressable accessibilityRole="button" onPress={() => openVerse(verse)} style={styles.savedCopy}>
-                  <EditorialLabel>{verse.savedKind === 'bookmark' ? 'BOOKMARK' : 'HIGHLIGHT'} · {reference}</EditorialLabel>
+                  <EditorialLabel>{verse.savedKind === 'bookmark' ? t('savedBible.bookmarkLabel') : t('savedBible.highlightLabel')} · {reference}</EditorialLabel>
                   <Text variant="headingSerif" style={styles.savedText} numberOfLines={4}>
-                    {verse.text}
+                    {text}
                   </Text>
                 </Pressable>
                 <View style={styles.rowActions}>
-                  <Button title="Open chapter" variant="secondary" onPress={() => openVerse(verse)} />
+                  <Button title={t('savedBible.openChapter')} variant="secondary" onPress={() => openVerse(verse)} />
                   {verse.savedKind === 'bookmark' ? (
-                    <Button title="Unsave" variant="ghost" onPress={() => removeBookmark(verse)} />
+                    <Button title={t('bible.unsave')} variant="ghost" onPress={() => removeBookmark(verse)} />
                   ) : (
-                    <Button title="Unhighlight" variant="ghost" onPress={() => removeHighlight(verse as BibleHighlightedVerse)} />
+                    <Button title={t('bible.unhighlight')} variant="ghost" onPress={() => removeHighlight(verse as BibleHighlightedVerse)} />
                   )}
                 </View>
               </View>
@@ -159,11 +168,11 @@ export default function SavedBibleScreen() {
         </View>
       ) : (
         <View style={[styles.emptyState, { borderColor: theme.colors.rule }]}>
-          <Text variant="headingSerif">{bookmarks.length || highlights.length ? 'Nothing matched.' : 'No saved Scripture yet.'}</Text>
+          <Text variant="headingSerif">{bookmarks.length || highlights.length ? t('journal.noMatchTitle') : t('savedBible.noSavedTitle')}</Text>
           <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-            {bookmarks.length || highlights.length ? 'Try a different word or filter.' : 'Open a chapter, tap a verse, then save or highlight it here.'}
+            {bookmarks.length || highlights.length ? t('journal.noMatchBody') : t('savedBible.noSavedBody')}
           </Text>
-          <Button title="Browse Bible" variant="secondary" onPress={() => router.push('/(tabs)/bible')} />
+          <Button title={t('savedBible.browse')} variant="secondary" onPress={() => router.push('/(tabs)/bible')} />
         </View>
       )}
     </Screen>

@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { LanguageProvider } from '@/context/LanguageContext';
 import { OnboardingProvider } from '@/context/OnboardingContext';
 
 export { ErrorBoundary } from 'expo-router';
@@ -18,16 +19,18 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <OnboardingProvider>
-          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(onboarding)" />
-            <Stack.Screen name="upgrade" />
-            <Stack.Screen name="review/weekly" />
-          </Stack>
-        </OnboardingProvider>
+        <LanguageProvider>
+          <OnboardingProvider>
+            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="(onboarding)" />
+              <Stack.Screen name="upgrade" />
+              <Stack.Screen name="review/weekly" />
+            </Stack>
+          </OnboardingProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

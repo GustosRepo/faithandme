@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, Chip, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { useOnboarding } from '@/context/OnboardingContext';
 
 const situations = [
@@ -21,22 +22,40 @@ const situations = [
   'Nothing specific right now',
 ];
 
+const situationLabelKeys: Record<string, TranslationKey> = {
+  Anxiety: 'topics.anxiety',
+  Relationships: 'topics.relationships',
+  Marriage: 'onboarding.situation.marriage',
+  Purpose: 'topics.purpose',
+  Temptation: 'onboarding.situation.temptation',
+  Anger: 'onboarding.situation.anger',
+  Grief: 'onboarding.situation.grief',
+  Loneliness: 'onboarding.situation.loneliness',
+  Stress: 'onboarding.situation.stress',
+  Discipline: 'onboarding.situation.discipline',
+  Finances: 'onboarding.situation.finances',
+  Parenting: 'onboarding.situation.parenting',
+  Faith: 'topics.faith',
+  'Nothing specific right now': 'onboarding.situation.none',
+};
+
 export default function SituationScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { state, toggleSituation } = useOnboarding();
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <EditorialLabel>Step 2 of 6</EditorialLabel>
-      <Text variant="displaySerif">What are you going through?</Text>
-      <Text variant="body" style={styles.subtleText}>You can choose more than one.</Text>
+      <EditorialLabel>{t('onboarding.step', { current: 2, total: 6 })}</EditorialLabel>
+      <Text variant="displaySerif">{t('onboarding.situation.title')}</Text>
+      <Text variant="body" style={styles.subtleText}>{t('onboarding.situation.subtitle')}</Text>
 
       <Card style={styles.optionCard}>
         <View style={styles.optionGrid}>
           {situations.map((option) => (
             <Chip
               key={option}
-              label={option}
+              label={t(situationLabelKeys[option])}
               selected={state.situations.includes(option)}
               onPress={() => toggleSituation(option)}
             />
@@ -46,7 +65,7 @@ export default function SituationScreen() {
 
       <View style={styles.footer}>
         <Button
-          title="Continue"
+          title={t('common.continue')}
           disabled={state.situations.length === 0}
           onPress={() => router.push('/(onboarding)/feeling')}
         />

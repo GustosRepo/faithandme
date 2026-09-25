@@ -67,6 +67,15 @@ No auth, user accounts, embeddings, RevenueCat, queues, or subscriptions are use
 
 Phase 5A.2 keeps the free anonymous limit at `FREE_ASKS_PER_DAY` and the same IP/global caps. Future paid tiers can raise the per-install limit after purchase validation, but server-side abuse and spend caps should remain in place for every tier.
 
+## Ask Request Language
+
+`POST /api/ask-scripture` accepts an optional `language` field:
+
+- `en` for English responses
+- `es` for natural Latin American Spanish responses
+
+If omitted, `language` defaults to `en` so older clients keep working. The app still sends canonical local BSB passages; Spanish-mode responses should not translate or quote Scripture text until a Spanish Bible corpus is bundled on-device.
+
 ## Production Validation
 
 The current production baseline is:
@@ -78,4 +87,4 @@ The current production baseline is:
 - `/health` returns `200`
 - `POST /api/ask-scripture` returns `200` with anonymous usage data when the OpenAI project has access to `gpt-5.6-luna`
 
-Successful Ask logs should include `requestId`, `endpoint`, `status`, `latencyMs`, `model`, `reasoningEffort`, and `tokenUsage`.
+Successful Ask logs should include `requestId`, `endpoint`, `status`, `latencyMs`, `model`, `reasoningEffort`, `language`, and `tokenUsage`.

@@ -3,14 +3,18 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { EditorialLabel, ProgressBar, Screen, Text } from '@/components/ui';
+import { useLanguage } from '@/context/LanguageContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
-import { scriptureService } from '@/services/scripture/ScriptureService';
+import { getScriptureService } from '@/services/scripture/ScriptureService';
 import { defaultBibleActivityState, loadBibleActivityState, type BibleActivityState } from '@/storage/bibleActivity';
 
 export default function BibleBookScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { language, t } = useLanguage();
   const { bookId } = useLocalSearchParams<{ bookId: string }>();
+  const scriptureService = getScriptureService(language);
+  const metadata = scriptureService.getBibleMetadata();
   const [activity, setActivity] = useState<BibleActivityState>(defaultBibleActivityState);
   const book = scriptureService.getBook(bookId ?? '');
 
@@ -20,7 +24,7 @@ export default function BibleBookScreen() {
     }, []),
   );
 
-  if (!book) return <Screen><Text variant="heading">Book unavailable.</Text></Screen>;
+  if (!book) return <Screen><Text variant="heading">{t('bible.bookUnavailable')}</Text></Screen>;
   const completedChapters = activity.completedChapters[book.id] ?? [];
   const completedSet = new Set(completedChapters);
   const progress = completedChapters.length / book.chapterCount;
@@ -29,10 +33,10 @@ export default function BibleBookScreen() {
   return (
     <Screen contentContainerStyle={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <EditorialLabel>Berean Standard Bible · BSB</EditorialLabel>
+      <EditorialLabel>{metadata.name} · {metadata.abbreviation}</EditorialLabel>
       <Text variant="displaySerif">{book.name}</Text>
       <Text variant="body" style={styles.muted}>
-        {completedChapters.length} of {book.chapterCount} chapters read.
+        {t('bible.chapterProgress', { completed: completedChapters.length, total: book.chapterCount })}
       </Text>
       <View style={styles.progressWrap}>
         <ProgressBar progress={progress} />
@@ -45,13 +49,13 @@ export default function BibleBookScreen() {
           accessibilityRole="button"
         >
           <View>
-            <Text variant="headingSerif">Chapter {chapter}</Text>
+            <Text variant="headingSerif">{t('bible.chapter', { chapter })}</Text>
             {currentChapter === chapter ? (
-              <Text variant="caption" style={{ color: theme.colors.accent }}>Current chapter</Text>
+              <Text variant="caption" style={{ color: theme.colors.accent }}>{t('bible.currentChapter')}</Text>
             ) : null}
           </View>
           <Text variant="bodySmall" style={{ color: completedSet.has(chapter) ? theme.colors.success : theme.colors.textMuted }}>
-            {completedSet.has(chapter) ? 'Read' : 'Open'}
+            {completedSet.has(chapter) ? t('bible.read') : t('bible.open')}
           </Text>
         </Pressable>
       ))}

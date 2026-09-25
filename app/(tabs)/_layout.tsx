@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
+import { useLanguage } from '@/context/LanguageContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
 export default function TabLayout() {
   const theme = useAppTheme();
+  const { t } = useLanguage();
 
   return (
     <Tabs
@@ -29,35 +31,35 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Today',
+          title: t('tabs.today'),
           tabBarIcon: ({ color, size }) => <Ionicons name="sunny-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="bible"
         options={{
-          title: 'Bible',
+          title: t('tabs.bible'),
           tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="ask"
         options={{
-          title: 'Ask',
+          title: t('tabs.ask'),
           tabBarIcon: ({ color, size }) => <Ionicons name="sparkles-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="journal"
         options={{
-          title: 'Journal',
+          title: t('tabs.journal'),
           tabBarIcon: ({ color, size }) => <Ionicons name="journal-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="me"
         options={{
-          title: 'Me',
+          title: t('tabs.me'),
           tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
         }}
       />

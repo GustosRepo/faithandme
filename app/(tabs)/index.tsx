@@ -3,13 +3,32 @@ import { StyleSheet, View } from 'react-native';
 
 import { BrandMark } from '@/components/BrandMark';
 import { Button, EditorialLabel, ProgressBar, Screen, Text } from '@/components/ui';
+import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { useDailySession } from '@/hooks/useDailySession';
-import { scriptureService } from '@/services/scripture/ScriptureService';
+import { getScriptureService } from '@/services/scripture/ScriptureService';
 
 const defaultTopics = ['Peace', 'Strength', 'Guidance', 'Love', 'Hope', 'Forgiveness', 'Courage'];
-const sessionSteps = ['Scripture', 'Reflect', 'Think', 'Pray', 'Act'];
+const sessionSteps = [
+  'today.step.scripture',
+  'today.step.reflect',
+  'today.step.think',
+  'today.step.pray',
+  'today.step.act',
+] as const;
+
+const topicLabelKeys: Record<string, TranslationKey> = {
+  Peace: 'topics.peace',
+  Strength: 'topics.strength',
+  Guidance: 'topics.guidance',
+  Love: 'topics.love',
+  Hope: 'topics.hope',
+  Forgiveness: 'topics.forgiveness',
+  Courage: 'topics.courage',
+  Faith: 'topics.faith',
+  Patience: 'topics.patience',
+};
 
 function getRecommendedTopics(feeling: string | null, situations: string[]): string[] {
   const basePriority: Record<string, string[]> = {
@@ -45,18 +64,20 @@ function getRecommendedTopics(feeling: string | null, situations: string[]): str
 export default function TodayScreen() {
   const theme = useAppTheme();
   const router = useRouter();
+  const { language, t } = useLanguage();
   const { state } = useOnboarding();
   const { selectedSession, progress, streak } = useDailySession();
+  const scriptureService = getScriptureService(language);
   const scripture = scriptureService.getPassage(selectedSession.scriptureReference);
   const topics = getRecommendedTopics(state.currentFeeling, state.situations);
   const contextText = state.currentFeeling && state.currentFeeling !== 'Prefer not to say'
-    ? `Feeling ${state.currentFeeling.toLowerCase()}`
+    ? t('today.feeling', { feeling: state.currentFeeling.toLowerCase() })
     : null;
 
   const completedCount = progress?.completedStages.length ?? 0;
   const progressValue = Math.min((completedCount / 5) || 0, 1);
   const isComplete = Boolean(progress?.completedAt);
-  const ctaTitle = isComplete ? 'Completed today ✓' : completedCount > 0 ? 'Continue session' : 'Start today\'s moment';
+  const ctaTitle = isComplete ? t('today.cta.complete') : completedCount > 0 ? t('today.cta.continue') : t('today.cta.start');
 
   const handleSessionPress = () => {
     router.push({ pathname: '/moment/[sessionId]', params: { sessionId: selectedSession.id } });
@@ -71,10 +92,10 @@ export default function TodayScreen() {
         </Text>
       ) : null}
       <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-        Good morning.
+        {t('today.greeting')}
       </Text>
       <Text variant="displaySerif" style={styles.heading}>
-        What do you need{'\n'}today?
+        {t('today.title')}
       </Text>
 
       <View style={styles.needList}>
@@ -93,27 +114,27 @@ export default function TodayScreen() {
                 { color: index === 0 ? theme.colors.accent : theme.colors.textSecondary },
               ]}
             >
-              {topic}
+              {t(topicLabelKeys[topic] ?? 'topics.peace')}
             </Text>
           </View>
         ))}
       </View>
 
       <View style={[styles.scriptureFeature, { borderColor: theme.colors.rule }]}>
-        <EditorialLabel>Daily Scripture</EditorialLabel>
+        <EditorialLabel>{t('today.dailyScripture')}</EditorialLabel>
         <Text variant="bodySmall" style={{ color: theme.colors.accent }}>{selectedSession.theme}</Text>
         <Text variant="scripture" style={styles.scriptureText}>
-          {scripture?.text ?? 'Scripture is unavailable.'}
+          {scripture?.text ?? t('today.scriptureUnavailable')}
         </Text>
         <Text variant="scriptureReference" style={{ color: theme.colors.textSecondary }}>
-          {scripture?.displayReference ?? selectedSession.scriptureReference} · BSB
+          {scripture?.displayReference ?? selectedSession.scriptureReference} · {scripture?.translation ?? scriptureService.getBibleMetadata().abbreviation}
         </Text>
       </View>
 
       <View style={styles.sectionHeaderRow}>
-        <EditorialLabel>Your 5 Minutes With God</EditorialLabel>
+        <EditorialLabel>{t('today.sessionTitle')}</EditorialLabel>
         <Text variant="caption" style={{ color: theme.colors.textMuted }}>
-          {completedCount} of 5
+          {t('today.progressCount', { completed: completedCount, total: 5 })}
         </Text>
       </View>
 
@@ -121,8 +142,8 @@ export default function TodayScreen() {
         <ProgressBar progress={progressValue} />
 
         <View style={styles.stepGrid}>
-          {sessionSteps.map((step, index) => (
-            <View key={step} style={styles.stepItem}>
+          {sessionSteps.map((stepKey, index) => (
+            <View key={stepKey} style={styles.stepItem}>
               <View
                 style={[
                   styles.stepDot,
@@ -133,7 +154,7 @@ export default function TodayScreen() {
                 ]}
               />
               <Text variant="caption" style={{ color: theme.colors.textSecondary }}>
-                {step}
+                {t(stepKey)}
               </Text>
             </View>
           ))}
@@ -142,9 +163,11 @@ export default function TodayScreen() {
 
       <View style={styles.streakRow}>
         <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
-          Daily streak
+          {t('today.dailyStreak')}
         </Text>
-        <Text variant="subheading">{streak.currentStreak} day{streak.currentStreak === 1 ? '' : 's'} streak</Text>
+        <Text variant="subheading">
+          {t(streak.currentStreak === 1 ? 'today.streak.one' : 'today.streak.other', { count: streak.currentStreak })}
+        </Text>
       </View>
 
       <Button title={ctaTitle} variant={isComplete ? 'secondary' : 'primary'} onPress={handleSessionPress} disabled={false} />

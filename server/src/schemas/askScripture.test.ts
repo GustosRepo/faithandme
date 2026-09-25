@@ -26,4 +26,22 @@ test('ask request accepts bounded question and passages', () => {
   });
 
   assert.equal(result.success, true);
+  assert.equal(result.success ? result.data.language : null, 'en');
+});
+
+test('ask request accepts Spanish response language', () => {
+  const result = askScriptureRequestSchema.safeParse({
+    question: 'Estoy ansioso y necesito ayuda para confiar en Dios.',
+    language: 'es',
+    passages: [
+      {
+        reference: 'PHP.4.6-7',
+        displayReference: 'Philippians 4:6-7',
+        text: 'Do not be anxious about anything...',
+      },
+    ],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.success ? result.data.language : null, 'es');
 });

@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Divider, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { defaultBibleActivityState, loadBibleActivityState, type BibleActivityState } from '@/storage/bibleActivity';
 import { loadJournalEntries, type JournalEntry } from '@/storage/journal';
@@ -22,26 +23,27 @@ function countCompletedChapters(activity: BibleActivityState) {
 
 function pickTheme(journalEntries: JournalEntry[]) {
   const text = journalEntries.map((entry) => entry.content).join(' ').toLowerCase();
-  const themes = [
-    { label: 'peace', words: ['peace', 'anxious', 'anxiety', 'worry', 'calm'] },
-    { label: 'trust', words: ['trust', 'faith', 'wait', 'control'] },
-    { label: 'forgiveness', words: ['forgive', 'forgiveness', 'anger', 'hurt'] },
-    { label: 'gratitude', words: ['thank', 'grateful', 'gratitude', 'mercy'] },
-    { label: 'purpose', words: ['purpose', 'direction', 'calling', 'next'] },
+  const themes: { key: TranslationKey; words: string[] }[] = [
+    { key: 'weekly.theme.peace', words: ['peace', 'paz', 'anxious', 'anxiety', 'ansiedad', 'worry', 'preocupado', 'calm', 'calma'] },
+    { key: 'weekly.theme.trust', words: ['trust', 'confianza', 'faith', 'fe', 'wait', 'esperar', 'control'] },
+    { key: 'weekly.theme.forgiveness', words: ['forgive', 'forgiveness', 'perdon', 'perdón', 'anger', 'enojo', 'hurt', 'dolor'] },
+    { key: 'weekly.theme.gratitude', words: ['thank', 'grateful', 'gratitude', 'gracias', 'agradecido', 'gratitud', 'mercy', 'misericordia'] },
+    { key: 'weekly.theme.purpose', words: ['purpose', 'propósito', 'proposito', 'direction', 'dirección', 'direccion', 'calling', 'llamado', 'next'] },
   ];
 
-  let best = { label: 'faithfulness', score: 0 };
+  let best = { key: 'weekly.theme.faithfulness' as TranslationKey, score: 0 };
   for (const theme of themes) {
     const score = theme.words.reduce((total, word) => total + (text.includes(word) ? 1 : 0), 0);
-    if (score > best.score) best = { label: theme.label, score };
+    if (score > best.score) best = { key: theme.key, score };
   }
 
-  return best.label;
+  return best.key;
 }
 
 export default function WeeklyReviewScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { t } = useLanguage();
   const [activity, setActivity] = useState<BibleActivityState>(defaultBibleActivityState);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
 
@@ -91,7 +93,7 @@ export default function WeeklyReviewScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Close weekly review"
+        accessibilityLabel={t('weekly.close')}
         hitSlop={10}
         onPress={() => router.back()}
         style={({ pressed }) => [styles.closeButton, { backgroundColor: theme.colors.surfaceSecondary, opacity: pressed ? 0.75 : 1 }]}
@@ -100,61 +102,61 @@ export default function WeeklyReviewScreen() {
       </Pressable>
 
       <View style={styles.hero}>
-        <EditorialLabel>Weekly Review</EditorialLabel>
-        <Text variant="displaySerif">What you carried this week.</Text>
+        <EditorialLabel>{t('weekly.label')}</EditorialLabel>
+        <Text variant="displaySerif">{t('weekly.title')}</Text>
         <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-          A local summary of what you prayed, saved, highlighted, and brought into reflection.
+          {t('weekly.subtitle')}
         </Text>
       </View>
 
       <View style={[styles.summaryBlock, { borderColor: theme.colors.rule }]}>
         <View style={styles.statsGrid}>
-          <ReviewStat label="journal" value={String(review.recentJournal.length)} />
-          <ReviewStat label="Ask saved" value={String(review.askSaved.length)} />
-          <ReviewStat label="Scripture" value={String(review.recentBookmarks.length + review.recentHighlights.length)} />
+          <ReviewStat label={t('weekly.stat.journal')} value={String(review.recentJournal.length)} />
+          <ReviewStat label={t('weekly.stat.askSaved')} value={String(review.askSaved.length)} />
+          <ReviewStat label={t('weekly.stat.scripture')} value={String(review.recentBookmarks.length + review.recentHighlights.length)} />
         </View>
         <Divider />
-        <Text variant="headingSerif">Theme to notice: {review.themeLabel}</Text>
+        <Text variant="headingSerif">{t('weekly.theme', { theme: t(review.themeLabel) })}</Text>
         <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-          Look for how this theme showed up in your prayers, Scripture, and next steps.
+          {t('weekly.themeBody')}
         </Text>
       </View>
 
       <View style={[styles.summaryBlock, { borderColor: theme.colors.rule }]}>
-        <EditorialLabel>Journal rhythm</EditorialLabel>
+        <EditorialLabel>{t('weekly.journalRhythm')}</EditorialLabel>
         <View style={styles.statsGrid}>
-          <ReviewStat label="prayers" value={String(review.prayerCount)} />
-          <ReviewStat label="reflections" value={String(review.reflectionCount)} />
-          <ReviewStat label="gratitude" value={String(review.gratitudeCount)} />
+          <ReviewStat label={t('me.prayers')} value={String(review.prayerCount)} />
+          <ReviewStat label={t('me.reflections')} value={String(review.reflectionCount)} />
+          <ReviewStat label={t('me.gratitude')} value={String(review.gratitudeCount)} />
         </View>
       </View>
 
       {review.featuredVerse ? (
         <View style={[styles.scriptureBlock, { borderColor: theme.colors.rule }]}>
-          <EditorialLabel>Scripture to revisit</EditorialLabel>
+          <EditorialLabel>{t('weekly.scriptureRevisit')}</EditorialLabel>
           <Text variant="headingSerif">{review.featuredVerse.reference}</Text>
           <Text variant="scripture" style={styles.scriptureText}>"{review.featuredVerse.text}"</Text>
         </View>
       ) : (
         <View style={[styles.summaryBlock, { borderColor: theme.colors.rule }]}>
-          <EditorialLabel>Scripture to revisit</EditorialLabel>
+          <EditorialLabel>{t('weekly.scriptureRevisit')}</EditorialLabel>
           <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-            Save or highlight Scripture this week and it will appear here.
+            {t('weekly.scriptureEmpty')}
           </Text>
         </View>
       )}
 
       <View style={[styles.summaryBlock, { borderColor: theme.colors.rule }]}>
-        <EditorialLabel>Reading progress</EditorialLabel>
-        <Text variant="headingSerif">{review.completedChapters} chapters marked read</Text>
+        <EditorialLabel>{t('weekly.readingProgress')}</EditorialLabel>
+        <Text variant="headingSerif">{t('weekly.chaptersMarked', { count: review.completedChapters })}</Text>
         <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>
-          Chapter completion is currently tracked as an all-time local count.
+          {t('weekly.chaptersNote')}
         </Text>
       </View>
 
       <View style={styles.actions}>
-        <Button title="Open Journal" variant="secondary" onPress={() => router.push('/(tabs)/journal')} />
-        <Button title="Saved Scripture" variant="secondary" onPress={() => router.push('/bible/saved')} />
+        <Button title={t('weekly.openJournal')} variant="secondary" onPress={() => router.push('/(tabs)/journal')} />
+        <Button title={t('weekly.savedScripture')} variant="secondary" onPress={() => router.push('/bible/saved')} />
       </View>
     </Screen>
   );

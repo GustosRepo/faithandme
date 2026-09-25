@@ -10,6 +10,7 @@ export const passageSchema = z.strictObject({
 
 export const askScriptureRequestSchema = z.strictObject({
   question: z.string().trim().min(serverConfig.limits.questionMinLength).max(serverConfig.limits.questionMaxLength),
+  language: z.enum(['en', 'es']).default('en'),
   passages: z.array(passageSchema).min(1).max(serverConfig.limits.maxPassages),
 });
 

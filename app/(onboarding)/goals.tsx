@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, Chip, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { useOnboarding } from '@/context/OnboardingContext';
 
 const goalOptions = [
@@ -14,22 +15,33 @@ const goalOptions = [
   'Get through something difficult',
 ];
 
+const goalLabelKeys: Record<string, TranslationKey> = {
+  'Grow closer to God': 'onboarding.goal.closer',
+  'Understand the Bible': 'onboarding.goal.understand',
+  'Build a daily habit': 'onboarding.goal.habit',
+  'Find guidance': 'onboarding.goal.guidance',
+  'Pray more': 'onboarding.goal.pray',
+  'Find peace': 'onboarding.goal.peace',
+  'Get through something difficult': 'onboarding.goal.difficult',
+};
+
 export default function GoalsScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { state, toggleGoal } = useOnboarding();
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <EditorialLabel>Step 1 of 6</EditorialLabel>
-      <Text variant="displaySerif">What brings you here?</Text>
-      <Text variant="body" style={styles.subtleText}>Choose everything that feels true for you.</Text>
+      <EditorialLabel>{t('onboarding.step', { current: 1, total: 6 })}</EditorialLabel>
+      <Text variant="displaySerif">{t('onboarding.goals.title')}</Text>
+      <Text variant="body" style={styles.subtleText}>{t('onboarding.goals.subtitle')}</Text>
 
       <Card style={styles.optionCard}>
         <View style={styles.optionGrid}>
           {goalOptions.map((option) => (
             <Chip
               key={option}
-              label={option}
+              label={t(goalLabelKeys[option])}
               selected={state.goals.includes(option)}
               onPress={() => toggleGoal(option)}
             />
@@ -39,7 +51,7 @@ export default function GoalsScreen() {
 
       <View style={styles.footer}>
         <Button
-          title="Continue"
+          title={t('common.continue')}
           disabled={state.goals.length === 0}
           onPress={() => router.push('/(onboarding)/situation')}
         />

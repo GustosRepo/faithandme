@@ -123,6 +123,7 @@ askScriptureRouter.post('/ask-scripture', async (req, res) => {
       latencyMs: Date.now() - startedAt,
       model: serverConfig.openAiModel,
       reasoningEffort: serverConfig.openAiReasoningEffort,
+      language: parsed.language,
       tokenUsage,
     }));
   } catch (error) {

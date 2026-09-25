@@ -4,12 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button, Chip, Divider, EditorialLabel, Screen, SectionHeader, Text } from '@/components/ui';
+import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import {
   addJournalEntry,
-  defaultJournalTitle,
   deleteJournalEntry,
-  journalKindLabel,
   loadJournalEntries,
   type JournalEntry,
   type JournalEntryKind,
@@ -22,31 +21,43 @@ const ENTRY_PREVIEW_LINES = 4;
 
 type JournalFilter = JournalEntryKind | 'all' | 'ask';
 
-const draftPrompts: Record<JournalEntryKind, string> = {
-  prayer: 'Lord,',
-  reflection: 'Today I noticed...',
-  gratitude: 'I am thankful for...',
+const kindTitleKeys: Record<JournalEntryKind, TranslationKey> = {
+  prayer: 'journal.kind.prayer',
+  reflection: 'journal.kind.reflection',
+  gratitude: 'journal.kind.gratitude',
 };
 
-const guidedPrompts: Record<JournalEntryKind, { label: string; text: string }[]> = {
+const kindLabelKeys: Record<JournalEntryKind, TranslationKey> = {
+  prayer: 'journal.kindLabel.prayer',
+  reflection: 'journal.kindLabel.reflection',
+  gratitude: 'journal.kindLabel.gratitude',
+};
+
+const draftPromptKeys: Record<JournalEntryKind, TranslationKey> = {
+  prayer: 'journal.prompt.prayer',
+  reflection: 'journal.prompt.reflection',
+  gratitude: 'journal.prompt.gratitude',
+};
+
+const guidedPrompts: Record<JournalEntryKind, { labelKey: TranslationKey; textKey: TranslationKey }[]> = {
   prayer: [
-    { label: 'Surrender', text: 'Lord, today I need to surrender...' },
-    { label: 'Intercession', text: 'Lord, I want to pray for...' },
-    { label: 'Courage', text: 'Lord, give me courage to...' },
+    { labelKey: 'journal.prompt.surrender', textKey: 'journal.prompt.surrenderText' },
+    { labelKey: 'journal.prompt.intercession', textKey: 'journal.prompt.intercessionText' },
+    { labelKey: 'journal.prompt.courage', textKey: 'journal.prompt.courageText' },
   ],
   reflection: [
-    { label: 'What I noticed', text: 'Today I noticed God meeting me in...' },
-    { label: 'What felt heavy', text: 'Something that felt heavy today was...' },
-    { label: 'What to practice', text: 'One faithful thing I can practice next is...' },
+    { labelKey: 'journal.prompt.noticed', textKey: 'journal.prompt.noticedText' },
+    { labelKey: 'journal.prompt.heavy', textKey: 'journal.prompt.heavyText' },
+    { labelKey: 'journal.prompt.practice', textKey: 'journal.prompt.practiceText' },
   ],
   gratitude: [
-    { label: 'Small mercy', text: 'A small mercy I received today was...' },
-    { label: 'Person', text: 'I am thankful for this person because...' },
-    { label: 'Provision', text: 'God provided for me today through...' },
+    { labelKey: 'journal.prompt.mercy', textKey: 'journal.prompt.mercyText' },
+    { labelKey: 'journal.prompt.person', textKey: 'journal.prompt.personText' },
+    { labelKey: 'journal.prompt.provision', textKey: 'journal.prompt.provisionText' },
   ],
 };
 
-function formatEntryDate(value: string) {
+function formatEntryDate(value: string, t: (key: TranslationKey) => string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
 
@@ -54,14 +65,15 @@ function formatEntryDate(value: string) {
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) return 'Today';
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  if (date.toDateString() === today.toDateString()) return t('common.today');
+  if (date.toDateString() === yesterday.toDateString()) return t('common.yesterday');
 
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
 }
 
 export default function JournalScreen() {
   const theme = useAppTheme();
+  const { t } = useLanguage();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [selectedKind, setSelectedKind] = useState<JournalEntryKind>('prayer');
   const [draft, setDraft] = useState('');
@@ -114,11 +126,11 @@ export default function JournalScreen() {
       return [
         entry.title,
         entry.content,
-        journalKindLabel(entry.kind),
+        t(kindTitleKeys[entry.kind]),
         entry.source === 'ask' ? 'Ask Scripture' : '',
       ].join(' ').toLowerCase().includes(normalizedSearch);
     });
-  }, [activeFilter, entries, normalizedSearch]);
+  }, [activeFilter, entries, normalizedSearch, t]);
   const visibleEntries = filteredEntries.slice(0, visibleEntryCount);
   const hiddenEntryCount = Math.max(filteredEntries.length - visibleEntries.length, 0);
 
@@ -133,7 +145,7 @@ export default function JournalScreen() {
     try {
       const entry = await addJournalEntry({
         kind: selectedKind,
-        title: defaultJournalTitle(selectedKind),
+        title: t(kindTitleKeys[selectedKind]),
         content: draft,
       });
       setEntries((current) => [entry, ...current]);
@@ -144,10 +156,10 @@ export default function JournalScreen() {
   };
 
   const handleDelete = (entry: JournalEntry) => {
-    Alert.alert('Delete entry?', 'This journal entry will be removed from this device.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('journal.deleteTitle'), t('journal.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           setEntries((current) => current.filter((item) => item.id !== entry.id));
@@ -172,16 +184,16 @@ export default function JournalScreen() {
       }}
     >
       <EditorialLabel>Journal</EditorialLabel>
-      <Text variant="displaySerif">Private reflection.</Text>
+      <Text variant="displaySerif">{t('journal.title')}</Text>
       <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-        Prayer, gratitude, and the thoughts you want to keep with God.
+        {t('journal.subtitle')}
       </Text>
 
       <View style={styles.kindRow}>
         {journalKinds.map((kind) => (
           <Chip
             key={kind}
-            label={`${defaultJournalTitle(kind)} ${entryCounts[kind] ? entryCounts[kind] : ''}`.trim()}
+            label={`${t(kindTitleKeys[kind])} ${entryCounts[kind] ? entryCounts[kind] : ''}`.trim()}
             selected={selectedKind === kind}
             onPress={() => setSelectedKind(kind)}
           />
@@ -190,30 +202,30 @@ export default function JournalScreen() {
 
       <View style={[styles.composer, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         <View style={styles.composerHeader}>
-          <EditorialLabel>{journalKindLabel(selectedKind)}</EditorialLabel>
+          <EditorialLabel>{t(kindLabelKeys[selectedKind])}</EditorialLabel>
           <Text variant="caption" style={{ color: theme.colors.textMuted }}>
-            {draft.length ? `${draft.length} characters` : ' '}
+            {draft.length ? t('journal.characters', { count: draft.length }) : ' '}
           </Text>
         </View>
         <TextInput
           multiline
           value={draft}
           onChangeText={setDraft}
-          placeholder={draftPrompts[selectedKind]}
+          placeholder={t(draftPromptKeys[selectedKind])}
           placeholderTextColor={theme.colors.textMuted}
           style={[styles.input, { color: theme.colors.text }]}
           textAlignVertical="top"
-          accessibilityLabel="Journal entry"
+          accessibilityLabel={t('journal.entryLabel')}
         />
         <View style={styles.promptBlock}>
-          <EditorialLabel>Guided prompts</EditorialLabel>
+          <EditorialLabel>{t('journal.guided')}</EditorialLabel>
           <View style={styles.kindRow}>
             {guidedPrompts[selectedKind].map((prompt) => (
-              <Chip key={prompt.label} label={prompt.label} onPress={() => handlePromptPress(prompt.text)} />
+              <Chip key={prompt.labelKey} label={t(prompt.labelKey)} onPress={() => handlePromptPress(t(prompt.textKey))} />
             ))}
           </View>
         </View>
-        <Button title={saving ? 'Saving...' : 'Save entry'} disabled={!canSave} onPress={handleSave} />
+        <Button title={saving ? t('journal.saving') : t('journal.save')} disabled={!canSave} onPress={handleSave} />
       </View>
 
       <View style={[styles.searchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
@@ -222,16 +234,16 @@ export default function JournalScreen() {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search journal"
+            placeholder={t('journal.search')}
             placeholderTextColor={theme.colors.textMuted}
             style={[styles.searchInput, { color: theme.colors.text }]}
-            accessibilityLabel="Search journal"
+            accessibilityLabel={t('journal.searchLabel')}
             returnKeyType="search"
           />
           {searchQuery ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Clear journal search"
+              accessibilityLabel={t('journal.clearSearch')}
               hitSlop={10}
               onPress={() => setSearchQuery('')}
             >
@@ -240,30 +252,30 @@ export default function JournalScreen() {
           ) : null}
         </View>
         <View style={styles.kindRow}>
-          <Chip label="All" selected={activeFilter === 'all'} onPress={() => setActiveFilter('all')} />
-          <Chip label="Prayer" selected={activeFilter === 'prayer'} onPress={() => setActiveFilter('prayer')} />
-          <Chip label="Reflection" selected={activeFilter === 'reflection'} onPress={() => setActiveFilter('reflection')} />
-          <Chip label="Gratitude" selected={activeFilter === 'gratitude'} onPress={() => setActiveFilter('gratitude')} />
-          <Chip label="From Ask" selected={activeFilter === 'ask'} onPress={() => setActiveFilter('ask')} />
+          <Chip label={t('common.all')} selected={activeFilter === 'all'} onPress={() => setActiveFilter('all')} />
+          <Chip label={t('journal.filter.prayer')} selected={activeFilter === 'prayer'} onPress={() => setActiveFilter('prayer')} />
+          <Chip label={t('journal.filter.reflection')} selected={activeFilter === 'reflection'} onPress={() => setActiveFilter('reflection')} />
+          <Chip label={t('journal.filter.gratitude')} selected={activeFilter === 'gratitude'} onPress={() => setActiveFilter('gratitude')} />
+          <Chip label={t('journal.filter.ask')} selected={activeFilter === 'ask'} onPress={() => setActiveFilter('ask')} />
         </View>
       </View>
 
-      <SectionHeader title="Recent entries" secondary={entries.length ? `${filteredEntries.length}/${entries.length} shown` : undefined} />
+      <SectionHeader title={t('journal.recent')} secondary={entries.length ? t('journal.shown', { filtered: filteredEntries.length, total: entries.length }) : undefined} />
       <View style={styles.entriesList}>
         {entries.length === 0 ? (
           <View style={[styles.emptyState, { borderColor: theme.colors.rule }]}>
-            <Text variant="headingSerif">A quiet place to begin.</Text>
+            <Text variant="headingSerif">{t('journal.emptyTitle')}</Text>
             <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-              Your prayers and reflections will stay on this device.
+              {t('journal.emptyBody')}
             </Text>
           </View>
         ) : null}
 
         {entries.length > 0 && filteredEntries.length === 0 ? (
           <View style={[styles.emptyState, { borderColor: theme.colors.rule }]}>
-            <Text variant="headingSerif">Nothing matched.</Text>
+            <Text variant="headingSerif">{t('journal.noMatchTitle')}</Text>
             <Text variant="body" style={{ color: theme.colors.textSecondary }}>
-              Try a different word or filter.
+              {t('journal.noMatchBody')}
             </Text>
           </View>
         ) : null}
@@ -271,20 +283,20 @@ export default function JournalScreen() {
         {visibleEntries.map((entry, index) => (
           <View key={entry.id}>
             <View style={styles.entryShell}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open journal entry"
+                <Pressable
+                  accessibilityRole="button"
+                accessibilityLabel={t('journal.openEntry')}
                 onPress={() => setSelectedEntry(entry)}
                 style={({ pressed }) => [styles.entryPreview, { opacity: pressed ? 0.72 : 1 }]}
               >
                 <View style={styles.entryRow}>
                   <View style={styles.entryTitleBlock}>
-                    <EditorialLabel>{journalKindLabel(entry.kind)}</EditorialLabel>
+                    <EditorialLabel>{t(kindLabelKeys[entry.kind])}</EditorialLabel>
                     {entry.source === 'ask' ? (
-                      <Text variant="caption" style={{ color: theme.colors.accent }}>From Ask Scripture</Text>
+                      <Text variant="caption" style={{ color: theme.colors.accent }}>{t('journal.fromAsk')}</Text>
                     ) : null}
                   </View>
-                  <Text variant="caption" style={{ color: theme.colors.textMuted }}>{formatEntryDate(entry.createdAt)}</Text>
+                  <Text variant="caption" style={{ color: theme.colors.textMuted }}>{formatEntryDate(entry.createdAt, t)}</Text>
                 </View>
                 <Text
                   variant="body"
@@ -297,7 +309,7 @@ export default function JournalScreen() {
               <View style={styles.entryActions}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Delete journal entry"
+                  accessibilityLabel={t('journal.deleteEntryLabel')}
                   hitSlop={10}
                   onPress={() => handleDelete(entry)}
                   style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
@@ -312,7 +324,7 @@ export default function JournalScreen() {
 
         {hiddenEntryCount > 0 ? (
           <Button
-            title={`Show ${Math.min(hiddenEntryCount, VISIBLE_ENTRY_INCREMENT)} more`}
+            title={t('journal.showMore', { count: Math.min(hiddenEntryCount, VISIBLE_ENTRY_INCREMENT) })}
             variant="secondary"
             onPress={() => setVisibleEntryCount((current) => current + VISIBLE_ENTRY_INCREMENT)}
           />
@@ -333,15 +345,15 @@ export default function JournalScreen() {
             >
               <View style={styles.detailHeader}>
                 <View style={styles.entryTitleBlock}>
-                  <EditorialLabel>{journalKindLabel(selectedEntry.kind)}</EditorialLabel>
+                  <EditorialLabel>{t(kindLabelKeys[selectedEntry.kind])}</EditorialLabel>
                   <Text variant="displaySerif">{selectedEntry.title}</Text>
                   <Text variant="caption" style={{ color: theme.colors.textMuted }}>
-                    {formatEntryDate(selectedEntry.createdAt)}
+                    {formatEntryDate(selectedEntry.createdAt, t)}
                   </Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Close journal entry"
+                  accessibilityLabel={t('journal.closeEntry')}
                   hitSlop={10}
                   onPress={() => setSelectedEntry(null)}
                   style={({ pressed }) => [styles.closeButton, { backgroundColor: theme.colors.surfaceSecondary, opacity: pressed ? 0.75 : 1 }]}
@@ -354,7 +366,7 @@ export default function JournalScreen() {
               <Text variant="body" style={[styles.detailBody, { color: theme.colors.textSecondary }]}>
                 {selectedEntry.content}
               </Text>
-              <Button title="Delete entry" variant="secondary" onPress={() => handleDelete(selectedEntry)} />
+              <Button title={t('journal.deleteEntry')} variant="secondary" onPress={() => handleDelete(selectedEntry)} />
             </ScrollView>
           </View>
         ) : null}

@@ -12,6 +12,14 @@ export type DailySession = {
   prayer: string;
   action: string;
   tags: string[];
+  localizations?: Partial<Record<'es', {
+    theme: string;
+    title: string;
+    reflection: string;
+    reflectionQuestions: string[];
+    prayer: string;
+    action: string;
+  }>>;
 };
 
 export type DailySessionProgress = {

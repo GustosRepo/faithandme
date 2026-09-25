@@ -154,10 +154,12 @@
 - [x] Me tab saved/highlighted verse counts now read from real Bible activity state
 - [x] Saved Scripture screen added for local bookmarks and highlights
 - [x] Bible home and Me tab link to Saved Scripture
+- [x] Bible chapter reader has a visible Back to chapters control
 - [x] TypeScript validation passes after the Bible interaction pass
 - [x] Simulator visual QA completed for Bible home, Revelation chapter list, and Revelation 1 reader layout
 - [x] Simulator visual QA completed for empty Saved Scripture state
 - [ ] Manually QA verse highlight/bookmark tap states, Mark chapter read, and Me counts on simulator/device
+- [ ] QA Bible reader Back to chapters control on simulator/device
 
 ## Ask + Journal development status
 
@@ -229,8 +231,54 @@
 - [x] TypeScript validation passes after background texture changes
 - [ ] QA background texture readability in light and dark mode on simulator/device
 
+## Spanish localization development status
+
+- [x] Local app language state added with AsyncStorage persistence
+- [x] Root app shell wrapped in LanguageProvider
+- [x] Bottom tab labels localized for English and Spanish
+- [x] Today screen localized, including greeting, topic labels, Daily Scripture labels, session progress, and streak copy
+- [x] 5 Minutes session shell localized, including stage labels, hints, close/continue actions, and completion state
+- [x] Ask Scripture UI localized, including usage copy, composer, suggested topic prompts, error states, answer section labels, follow-up actions, and save-to-Journal actions
+- [x] Ask suggested questions and follow-up prompts are language-aware so Spanish mode nudges AI responses toward Spanish
+- [x] Journal UI localized, including composer, guided prompts, search/filter controls, archive states, date words, full-entry modal, and delete alerts
+- [x] Bible home, book chapter list, chapter reader controls, and Saved Scripture screen localized
+- [x] Weekly Review localized, including theme labels and Spanish-aware theme keyword detection
+- [x] Onboarding screens localized while preserving existing English internal personalization values for compatibility
+- [x] Me tab primary dashboard, shortcuts, preferences, Plus block, and developer actions localized
+- [x] Me preferences now include an English/Español language selector
+- [x] Plus upgrade screen localized, including free/Plus feature copy and temporary subscription alerts
+- [x] Spanish devotional/session copy added for all current daily-session themes
+- [x] Daily-session selection now localizes visible devotional copy without changing stored session ids
+- [x] Ask Scripture mobile requests now include selected app language
+- [x] Ask Scripture server schema accepts `language: "en" | "es"` with English default
+- [x] Ask Scripture server prompt now explicitly requests natural Latin American Spanish for Spanish-mode users
+- [x] Successful Ask logs now include request language
+- [x] Server schema tests cover Spanish Ask request language
+- [x] Spanish aliases added to local Ask Scripture reference retrieval topics
+- [x] Public-domain Reina-Valera 1909 provenance documented
+- [x] Reina-Valera 1909 USFM importer added
+- [x] Generic scripture dataset validator added for bundled Bible corpora
+- [x] Reina-Valera 1909 corpus generated at `data/rv1909.json`
+- [x] Reina-Valera 1909 corpus validates with 66 books, 1,189 chapters, no duplicate references, no empty verse records, and no malformed records
+- [x] ScriptureService selects BSB for English and RV1909 for Spanish
+- [x] Today and 5 Minutes daily Scripture resolve through the active Bible provider
+- [x] Bible home, book list, chapter reader, and Saved Scripture resolve through the active Bible provider
+- [x] Ask Scripture retrieval and displayed verses resolve through the active Bible provider
+- [x] Me tab Bible translation preference displays the active Bible provider
+- [x] Focused runtime check confirms Spanish retrieval returns RV1909 and English retrieval still returns BSB
+- [x] TypeScript validation passes after the expanded Spanish localization pass
+- [x] Server typecheck and tests pass after Ask language-awareness changes
+- [ ] QA language switching on simulator/device, including persistence after app restart
+- [ ] QA Spanish Bible reading, saved verses, highlights, and Ask answer Scripture display
+- [ ] Review RV1909 public-domain Spanish orthography and UX expectations before launch
+- [ ] Review all Spanish copy with a native speaker before launch
+- [ ] Add device-language detection if we decide Spanish users should see Español automatically on first launch
+
 ## Next priority
 
+- [ ] QA Spanish language switching across Today, 5 Minutes, Ask, Journal, Bible, Saved Scripture, Weekly Review, Onboarding, Me, and Plus
+- [ ] QA Spanish Ask Scripture answers using RV1909 local verse text
+- [ ] QA Spanish Bible reading, bookmarks, highlights, and saved Scripture display
 - [ ] QA background texture across primary screens
 - [ ] Decide RevenueCat vs direct StoreKit for subscription plumbing
 - [ ] Implement first devotional paths

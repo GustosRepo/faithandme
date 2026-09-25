@@ -2,28 +2,30 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, EditorialLabel, Screen, Text } from '@/components/ui';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function PreviewScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   return (
     <Screen contentContainerStyle={styles.container}>
-      <EditorialLabel>Step 5 of 6</EditorialLabel>
-      <Text variant="displaySerif">Keep His Word close.</Text>
-      <Text variant="body" style={styles.subtleText}>Your daily Scripture can meet you right where you already are.</Text>
+      <EditorialLabel>{t('onboarding.step', { current: 5, total: 6 })}</EditorialLabel>
+      <Text variant="displaySerif">{t('onboarding.preview.title')}</Text>
+      <Text variant="body" style={styles.subtleText}>{t('onboarding.preview.subtitle')}</Text>
 
       <Card style={styles.widgetShell}>
         <View style={styles.widgetPreview}>
-          <Text variant="scripture" style={styles.widgetVerse}>“Be still, and know that I am God.”</Text>
-          <Text variant="scriptureReference" style={styles.widgetReference}>Psalm 46:10</Text>
+          <Text variant="scripture" style={styles.widgetVerse}>{t('onboarding.preview.verse')}</Text>
+          <Text variant="scriptureReference" style={styles.widgetReference}>{t('onboarding.preview.reference')}</Text>
           <Text variant="bodySmall" style={styles.widgetBrand}>Faith & Me</Text>
         </View>
       </Card>
 
-      <Text variant="bodySmall" style={styles.subtleText}>One daily Scripture widget will always be free.</Text>
+      <Text variant="bodySmall" style={styles.subtleText}>{t('onboarding.preview.free')}</Text>
 
       <View style={styles.footer}>
-        <Button title="Continue" onPress={() => router.push('/(onboarding)/ready')} />
+        <Button title={t('common.continue')} onPress={() => router.push('/(onboarding)/ready')} />
       </View>
     </Screen>
   );

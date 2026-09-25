@@ -39,6 +39,7 @@ Next Bible QA:
 - Bookmark and unsave
 - Mark chapter read
 - Me tab saved/highlighted verse counts
+- Tap Back to chapters from a chapter reader and confirm it opens the current book's chapter list.
 
 ## Latest development pass: Ask + Journal local reflection loop
 
@@ -115,6 +116,68 @@ Status:
 - Texture is theme-aware with restrained light/dark opacity.
 - No image assets, gradients, backend, AI behavior, navigation, account, RevenueCat, StoreKit, or paid-tier changes were added.
 - TypeScript validation passes with `npx tsc --noEmit --pretty false`.
+
+## Latest development pass: Bible reader exit control
+
+Status:
+
+- Bible chapter reader now has a visible top-left back control.
+- The control is labeled "Back to chapters" and routes directly to the current book's chapter list.
+- This removes reliance on the hidden swipe/back gesture for leaving a chapter.
+- No Bible content, activity persistence, backend, AI behavior, account, RevenueCat, StoreKit, or paid-tier changes were added.
+- TypeScript validation passes with `npx tsc --noEmit --pretty false`.
+
+## Latest development pass: Spanish localization foundation
+
+Status:
+
+- Added a local app language provider with AsyncStorage persistence.
+- Added a Me tab language selector for English and Español.
+- Localized the bottom tab labels.
+- Localized the Today screen's primary UI, Daily Scripture labels, recommended topic labels, session progress, and streak copy.
+- Localized the 5 Minutes session shell, including stage labels, hints, navigation actions, and completion state.
+- Localized Ask Scripture UI, including usage copy, composer, suggested topics, error states, answer section labels, follow-up actions, and save-to-Journal actions.
+- Ask suggested questions and follow-up prompts now switch language, which should steer Spanish-mode Ask responses toward Spanish when users tap built-in prompts.
+- Localized Journal UI, including entry type labels, guided prompts, search/filter controls, empty states, full-entry modal, and delete alerts.
+- Localized Bible home, book chapter lists, chapter reader controls, and Saved Scripture search/filter/empty states.
+- Localized Weekly Review and added Spanish-aware keyword detection for its simple theme picker.
+- Localized onboarding screens while preserving existing English internal personalization values so the current recommendation logic keeps working.
+- Localized the Me dashboard's primary headings, stats, shortcuts, preferences, Plus section, and development actions.
+- Localized the Plus upgrade screen, including the plan copy, always-free list, CTA labels, and temporary subscription setup alert.
+- Added Spanish devotional/session copy for all current daily-session themes.
+- Daily-session ids stay stable while the visible theme, reflection, reflection questions, prayer, and action localize by app language.
+- Mobile Ask Scripture requests now include the selected app language.
+- The server accepts `language: "en" | "es"` with an English default for older clients.
+- The server prompt now asks for natural Latin American Spanish for Spanish-mode users and logs request language on successful Ask requests.
+- Kept Bible corpus/content, accounts, backend entitlements, RevenueCat, StoreKit, and paid-tier enforcement unchanged.
+- TypeScript validation passes with `npx tsc --noEmit --pretty false`.
+- Server typecheck passes with `npm run typecheck` in `server/`.
+- Server tests pass with `npm test` in `server/`.
+- Local Ask Scripture reference retrieval now includes Spanish aliases for the existing curated topics.
+- Added a public-domain Reina-Valera 1909 source pipeline:
+  - RV1909 provenance documented in `docs/RV1909_SOURCE.md`.
+  - USFM importer added at `scripts/import-rv1909.mjs`.
+  - Generic scripture dataset validator added at `scripts/validate-scripture-dataset.mjs`.
+  - Spanish corpus generated at `data/rv1909.json`.
+  - RV1909 validates as 66 books, 1,189 chapters, no duplicate references, no empty verse records, and no malformed records.
+- ScriptureService now selects BSB for English and RV1909 for Spanish.
+- Today, 5 Minutes, Bible, Saved Scripture, Me, and Ask displayed Scripture now resolve through the active language's Bible provider.
+- Saved bookmarks/highlights continue to use stable canonical references and display through the current language when possible.
+- Focused runtime check confirms Spanish Ask retrieval returns RV1909 text and English retrieval still returns BSB text.
+
+Important scope note:
+
+- This pass covers the main app-shell/UI layer and first-run onboarding.
+- Spanish Bible corpus is now bundled and wired into the local ScriptureService.
+- Existing saved Bible activity is shared across English/Spanish by canonical references; older saved text is only used as a fallback if the active corpus cannot resolve a verse.
+
+Next Spanish implementation:
+
+1. QA the English/Español switch on simulator/device and confirm the selected language persists after app restart.
+2. Review Spanish wrapping on compact screens, especially tab labels, onboarding chips, Ask answer actions, and Bible reader controls.
+3. QA Bible reading, saved verses, highlights, and Ask answers in both English and Spanish modes.
+4. Review RV1909 accent/orthography expectations in-app; it is faithful public-domain text but visibly older Spanish.
+5. Consider first-launch device-language detection after QA confirms the Spanish flow feels ready.
 
 ## Plus product strategy
 
