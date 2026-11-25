@@ -31,14 +31,21 @@ iOS Simulator can generally reach the Mac host with `http://localhost:3000`. Phy
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.6-luna
 OPENAI_REASONING_EFFORT=low
-FREE_ASKS_PER_DAY=3
+OPENAI_PLUS_REASONING_EFFORT=medium
+FREE_ASKS_PER_DAY=1
+PLUS_ASKS_PER_DAY=20
 MAX_ASKS_PER_IP_PER_DAY=30
 MAX_AI_REQUESTS_PER_DAY=500
 ASK_SCRIPTURE_ENABLED=true
 IP_HASH_SECRET=
+ASK_SESSION_SECRET=
+REVENUECAT_API_KEY=
+REVENUECAT_ENTITLEMENT_ID=plus
 ```
 
-Use a long random value for `IP_HASH_SECRET`. Do not expose it to the mobile app.
+Use separate, long random values for `IP_HASH_SECRET` and `ASK_SESSION_SECRET`, for example by running `openssl rand -hex 32` for each. Keep the session secret stable across deploys and identical on all API replicas. Keep both secrets on the server.
+
+`REVENUECAT_API_KEY` is the server-only RevenueCat secret API key. When enabled, the server loads the entitlement from RevenueCat for verified purchase sessions and applies `PLUS_ASKS_PER_DAY` and deeper reasoning for Plus. Keep the RevenueCat entitlement identifier set to `plus` to match the app. With RevenueCat disabled, Ask Scripture uses the free tier.
 
 4. Deploy the service.
 5. Open the Railway-generated public domain and verify `/health`.
@@ -46,26 +53,30 @@ Use a long random value for `IP_HASH_SECRET`. Do not expose it to the mobile app
 
 ```sh
 EXPO_PUBLIC_FAITH_API_URL=https://your-railway-domain
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=
 ```
 
-7. Restart the Expo app so the public API URL is loaded.
+7. Build the native app with the public SDK key for the target platform. Set RevenueCat's restore behavior to **Transfer to new App User ID** so users can recover access after reinstalling or moving to another device with the same store account.
 
 ## Usage Limit Semantics
 
-Ask Scripture uses anonymous usage buckets, not accounts. The mobile app generates a random installation UUID and sends it as `X-Faith-Client-Id`. The server applies:
+Ask Scripture uses the installation UUID in `X-Faith-Client-Id` for usage counters. To enable purchases, `POST /api/ask-scripture/session` issues a separate RevenueCat subscriber ID and a signed session token bound to the installation. The app stores the token in SecureStore and sends it as a bearer credential. `POST /api/ask-scripture/entitlement` verifies the session and refreshes the entitlement after purchase or restore. Existing clients can continue using the free tier with their installation UUID. The server applies:
 
-- per-install UTC-day limit from `FREE_ASKS_PER_DAY`
-- hashed-IP UTC-day backstop from `MAX_ASKS_PER_IP_PER_DAY`
+- per-install UTC-day limit from `FREE_ASKS_PER_DAY` (free tier) or `PLUS_ASKS_PER_DAY` (active `plus` entitlement)
+- hashed-IP UTC-day backstop from `MAX_ASKS_PER_IP_PER_DAY` (free tier only; paying members are never blocked by shared networks)
 - global UTC-day OpenAI cap from `MAX_AI_REQUESTS_PER_DAY`
 - emergency switch from `ASK_SCRIPTURE_ENABLED`
+
+## Scripture Integrity
+
+The server resolves canonical passage text (BSB for English, RV1909 for Spanish) from each requested reference using the datasets in the repository `data/` directory. Client-supplied passage text is accepted for backwards compatibility but never trusted or forwarded to the model. Unknown references are rejected with `INVALID_REQUEST`. Set `BIBLE_DATA_DIR` if the data files live somewhere other than `./data` or `../data` relative to the server working directory.
 
 Daily devotional/streak dates remain device-local. AI usage limits use server UTC dates.
 
 PostgreSQL stores only usage counters: bucket type, bucket key, UTC date, counts, and timestamps. It does not store questions, answers, passages, onboarding data, journal entries, names, emails, or device fingerprints.
 
-No auth, user accounts, embeddings, RevenueCat, queues, or subscriptions are used in Phase 5A.1.
-
-Phase 5A.2 keeps the free anonymous limit at `FREE_ASKS_PER_DAY` and the same IP/global caps. Future paid tiers can raise the per-install limit after purchase validation, but server-side abuse and spend caps should remain in place for every tier.
+Ask Scripture shares submitted questions with OpenAI after the app obtains consent. The server shares onboarding context only when an ask includes explicit personalization consent. The OpenAI Responses request sets `store: false`.
 
 ## Ask Request Language
 
@@ -74,7 +85,7 @@ Phase 5A.2 keeps the free anonymous limit at `FREE_ASKS_PER_DAY` and the same IP
 - `en` for English responses
 - `es` for natural Latin American Spanish responses
 
-If omitted, `language` defaults to `en` so older clients keep working. The app still sends canonical local BSB passages; Spanish-mode responses should not translate or quote Scripture text until a Spanish Bible corpus is bundled on-device.
+If omitted, `language` defaults to `en`. The server and app use BSB passages in English and RV1909 passages in Spanish.
 
 ## Production Validation
 

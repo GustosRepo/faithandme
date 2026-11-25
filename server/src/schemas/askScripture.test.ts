@@ -29,6 +29,26 @@ test('ask request accepts bounded question and passages', () => {
   assert.equal(result.success ? result.data.language : null, 'en');
 });
 
+test('ask request accepts reference-only passages and bounded context', () => {
+  const result = askScriptureRequestSchema.safeParse({
+    question: 'I am angry and need help responding with patience.',
+    passages: [{ reference: 'JAS.1.19-20' }],
+    context: { feeling: 'Frustrated', situations: ['Anger'], goals: ['Find peace'] },
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('ask request rejects oversized personalization context', () => {
+  const result = askScriptureRequestSchema.safeParse({
+    question: 'I am angry and need help responding with patience.',
+    passages: [{ reference: 'JAS.1.19-20' }],
+    context: { goals: ['a', 'b', 'c', 'd'] },
+  });
+
+  assert.equal(result.success, false);
+});
+
 test('ask request accepts Spanish response language', () => {
   const result = askScriptureRequestSchema.safeParse({
     question: 'Estoy ansioso y necesito ayuda para confiar en Dios.',

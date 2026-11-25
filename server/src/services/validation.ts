@@ -1,9 +1,9 @@
 import { serverConfig } from '../config.js';
-import type { AskScriptureRequest, ModelAskScriptureResponse } from '../schemas/askScripture.js';
+import type { ModelAskScriptureResponse } from '../schemas/askScripture.js';
 import { modelResponseSchema } from '../schemas/askScripture.js';
 
-export function validateTotalPassageTextLength(request: AskScriptureRequest) {
-  const total = request.passages.reduce((sum, passage) => sum + passage.text.length, 0);
+export function validateTotalPassageTextLength(passages: Array<{ text: string }>) {
+  const total = passages.reduce((sum, passage) => sum + passage.text.length, 0);
   return total <= serverConfig.limits.maxTotalPassageTextLength;
 }
 

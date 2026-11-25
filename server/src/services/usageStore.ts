@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 
 import { serverConfig } from '../config.js';
-import { getAskPolicy } from './askPolicy.js';
+import { getAskPolicy, type AskPolicy } from './askPolicy.js';
 
 const { Pool } = pg;
 
@@ -16,21 +16,24 @@ export type UsageSnapshot = {
   resetsAt: string;
 };
 
+export type UsageQueryInput = { clientId: string; dateKey: string; resetsAt: string; policy?: AskPolicy };
+export type ReserveAskInput = { clientId: string; ipHash: string; dateKey: string; resetsAt: string; policy?: AskPolicy };
+
 export type ReservationResult =
   | { ok: true; reservationId: string }
   | { ok: false; status: number; code: string; message: string; limit?: number; usage?: UsageSnapshot };
 
 export interface UsageStore {
   initialize(): Promise<void>;
-  getClientUsage(input: { clientId: string; dateKey: string; resetsAt: string }): Promise<UsageSnapshot>;
-  reserveAsk(input: { clientId: string; ipHash: string; dateKey: string; resetsAt: string }): Promise<ReservationResult>;
+  getClientUsage(input: UsageQueryInput): Promise<UsageSnapshot>;
+  reserveAsk(input: ReserveAskInput): Promise<ReservationResult>;
   commitReservation(reservationId: string): Promise<UsageSnapshot>;
   releaseReservation(reservationId: string): Promise<void>;
 }
 
 type BucketKey = `${UsageBucketType}:${string}:${string}`;
 type Bucket = { askCount: number; activeCount: number; lastSeenAt: Date };
-type MemoryReservation = { clientKey: BucketKey; ipKey: BucketKey; globalKey: BucketKey; dateKey: string; resetsAt: string };
+type MemoryReservation = { clientKey: BucketKey; ipKey: BucketKey; globalKey: BucketKey; dateKey: string; resetsAt: string; policy: AskPolicy };
 
 function snapshot(used: number, limit: number, resetsAt: string): UsageSnapshot {
   return { limit, used, remaining: Math.max(limit - used, 0), resetsAt };
@@ -54,14 +57,14 @@ export class MemoryUsageStore implements UsageStore {
     return created;
   }
 
-  async getClientUsage(input: { clientId: string; dateKey: string; resetsAt: string }) {
-    const policy = getAskPolicy('free');
+  async getClientUsage(input: UsageQueryInput) {
+    const policy = input.policy ?? getAskPolicy('free');
     const bucket = this.getBucket(this.key('client', input.clientId, input.dateKey));
-    return snapshot(bucket.askCount, policy.freeAsksPerDay, input.resetsAt);
+    return snapshot(bucket.askCount, policy.asksPerDay, input.resetsAt);
   }
 
-  async reserveAsk(input: { clientId: string; ipHash: string; dateKey: string; resetsAt: string }): Promise<ReservationResult> {
-    const policy = getAskPolicy('free');
+  async reserveAsk(input: ReserveAskInput): Promise<ReservationResult> {
+    const policy = input.policy ?? getAskPolicy('free');
     const clientKey = this.key('client', input.clientId, input.dateKey);
     const ipKey = this.key('ip', input.ipHash, input.dateKey);
     const globalKey = this.key('global', 'ask-scripture', input.dateKey);
@@ -70,17 +73,17 @@ export class MemoryUsageStore implements UsageStore {
     const global = this.getBucket(globalKey);
 
     if (client.activeCount > 0) return { ok: false, status: 429, code: 'ASK_ALREADY_IN_PROGRESS', message: 'Your previous question is still being prepared.' };
-    if (client.askCount + client.activeCount >= policy.freeAsksPerDay) {
-      return { ok: false, status: 429, code: 'DAILY_ASK_LIMIT', message: "You've used today's free Ask Scripture questions.", limit: policy.freeAsksPerDay, usage: snapshot(client.askCount, policy.freeAsksPerDay, input.resetsAt) };
+    if (client.askCount + client.activeCount >= policy.asksPerDay) {
+      return { ok: false, status: 429, code: 'DAILY_ASK_LIMIT', message: "You've used today's free Ask Scripture questions.", limit: policy.asksPerDay, usage: snapshot(client.askCount, policy.asksPerDay, input.resetsAt) };
     }
-    if (ip.askCount + ip.activeCount >= policy.maxAsksPerIpPerDay) return { ok: false, status: 429, code: 'IP_DAILY_LIMIT', message: "Ask Scripture isn't available from this network right now. Please try again later." };
+    if (!policy.bypassIpLimit && ip.askCount + ip.activeCount >= policy.maxAsksPerIpPerDay) return { ok: false, status: 429, code: 'IP_DAILY_LIMIT', message: "Ask Scripture isn't available from this network right now. Please try again later." };
     if (global.askCount + global.activeCount >= policy.maxAiRequestsPerDay) return { ok: false, status: 503, code: 'AI_DAILY_CAP', message: 'Ask Scripture is temporarily unavailable. Please try again later.' };
 
     client.activeCount += 1;
     ip.activeCount += 1;
     global.activeCount += 1;
     const reservationId = randomUUID();
-    this.reservations.set(reservationId, { clientKey, ipKey, globalKey, dateKey: input.dateKey, resetsAt: input.resetsAt });
+    this.reservations.set(reservationId, { clientKey, ipKey, globalKey, dateKey: input.dateKey, resetsAt: input.resetsAt, policy });
     return { ok: true, reservationId };
   }
 
@@ -94,9 +97,8 @@ export class MemoryUsageStore implements UsageStore {
       bucket.lastSeenAt = new Date();
     }
     this.reservations.delete(reservationId);
-    const policy = getAskPolicy('free');
     const client = this.getBucket(reservation.clientKey);
-    return snapshot(client.askCount, policy.freeAsksPerDay, reservation.resetsAt);
+    return snapshot(client.askCount, reservation.policy.asksPerDay, reservation.resetsAt);
   }
 
   async releaseReservation(reservationId: string) {
@@ -164,17 +166,18 @@ export class PostgresUsageStore implements UsageStore {
     return { askCount: Number(row?.ask_count ?? 0), activeCount: Number(row?.active_count ?? 0) };
   }
 
-  async getClientUsage(input: { clientId: string; dateKey: string; resetsAt: string }) {
+  async getClientUsage(input: UsageQueryInput) {
+    const policy = input.policy ?? getAskPolicy('free');
     const result = await this.pool.query<{ ask_count: number }>(
       `SELECT ask_count FROM anonymous_usage WHERE bucket_type = 'client' AND bucket_key = $1 AND date_key = $2`,
       [input.clientId, input.dateKey],
     );
     const used = Number(result.rows[0]?.ask_count ?? 0);
-    return snapshot(used, getAskPolicy('free').freeAsksPerDay, input.resetsAt);
+    return snapshot(used, policy.asksPerDay, input.resetsAt);
   }
 
-  async reserveAsk(input: { clientId: string; ipHash: string; dateKey: string; resetsAt: string }): Promise<ReservationResult> {
-    const policy = getAskPolicy('free');
+  async reserveAsk(input: ReserveAskInput): Promise<ReservationResult> {
+    const policy = input.policy ?? getAskPolicy('free');
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -189,8 +192,8 @@ export class PostgresUsageStore implements UsageStore {
 
       let failure: ReservationResult | null = null;
       if (clientBucket.activeCount > 0) failure = { ok: false, status: 429, code: 'ASK_ALREADY_IN_PROGRESS', message: 'Your previous question is still being prepared.' };
-      else if (clientBucket.askCount + clientBucket.activeCount >= policy.freeAsksPerDay) failure = { ok: false, status: 429, code: 'DAILY_ASK_LIMIT', message: "You've used today's free Ask Scripture questions.", limit: policy.freeAsksPerDay, usage: snapshot(clientBucket.askCount, policy.freeAsksPerDay, input.resetsAt) };
-      else if (ipBucket.askCount + ipBucket.activeCount >= policy.maxAsksPerIpPerDay) failure = { ok: false, status: 429, code: 'IP_DAILY_LIMIT', message: "Ask Scripture isn't available from this network right now. Please try again later." };
+      else if (clientBucket.askCount + clientBucket.activeCount >= policy.asksPerDay) failure = { ok: false, status: 429, code: 'DAILY_ASK_LIMIT', message: "You've used today's free Ask Scripture questions.", limit: policy.asksPerDay, usage: snapshot(clientBucket.askCount, policy.asksPerDay, input.resetsAt) };
+      else if (!policy.bypassIpLimit && ipBucket.askCount + ipBucket.activeCount >= policy.maxAsksPerIpPerDay) failure = { ok: false, status: 429, code: 'IP_DAILY_LIMIT', message: "Ask Scripture isn't available from this network right now. Please try again later." };
       else if (globalBucket.askCount + globalBucket.activeCount >= policy.maxAiRequestsPerDay) failure = { ok: false, status: 503, code: 'AI_DAILY_CAP', message: 'Ask Scripture is temporarily unavailable. Please try again later.' };
 
       if (failure) {
@@ -226,9 +229,9 @@ export class PostgresUsageStore implements UsageStore {
 }
 
 class PostgresUsageReservationStore extends PostgresUsageStore {
-  private reservations = new Map<string, { clientId: string; ipHash: string; dateKey: string; resetsAt: string }>();
+  private reservations = new Map<string, ReserveAskInput>();
 
-  override async reserveAsk(input: { clientId: string; ipHash: string; dateKey: string; resetsAt: string }) {
+  override async reserveAsk(input: ReserveAskInput) {
     const result = await super.reserveAsk(input);
     if (result.ok) this.reservations.set(result.reservationId, input);
     return result;
@@ -250,7 +253,7 @@ class PostgresUsageReservationStore extends PostgresUsageStore {
       }
       await client.query('COMMIT');
       this.reservations.delete(reservationId);
-      return this.getClientUsage({ clientId: reservation.clientId, dateKey: reservation.dateKey, resetsAt: reservation.resetsAt });
+      return this.getClientUsage({ clientId: reservation.clientId, dateKey: reservation.dateKey, resetsAt: reservation.resetsAt, policy: reservation.policy });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

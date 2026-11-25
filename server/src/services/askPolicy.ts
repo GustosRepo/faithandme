@@ -1,20 +1,24 @@
 import { serverConfig } from '../config.js';
 
-export type AskEntitlement = 'free';
+export type AskEntitlement = 'free' | 'plus';
 
 export type AskPolicy = {
   entitlement: AskEntitlement;
-  freeAsksPerDay: number;
+  asksPerDay: number;
   maxAsksPerIpPerDay: number;
   maxAiRequestsPerDay: number;
+  /** Paying members are never blocked by shared-network (church, dorm) IP buckets. */
+  bypassIpLimit: boolean;
 };
 
-export function getAskPolicy(_entitlement: AskEntitlement = 'free'): AskPolicy {
+export function getAskPolicy(entitlement: AskEntitlement = 'free'): AskPolicy {
+  const isPlus = entitlement === 'plus';
   return {
-    entitlement: 'free',
-    freeAsksPerDay: serverConfig.limits.freeAsksPerDay,
+    entitlement,
+    asksPerDay: isPlus ? serverConfig.limits.plusAsksPerDay : serverConfig.limits.freeAsksPerDay,
     maxAsksPerIpPerDay: serverConfig.limits.maxAsksPerIpPerDay,
     maxAiRequestsPerDay: serverConfig.limits.maxAiRequestsPerDay,
+    bypassIpLimit: isPlus,
   };
 }
 

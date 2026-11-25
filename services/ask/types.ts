@@ -6,6 +6,14 @@ export type AskScripturePassagePayload = {
   text: string;
 };
 
+export type AskEntitlement = 'free' | 'plus';
+
+export type AskUserContext = {
+  goals?: string[];
+  situations?: string[];
+  feeling?: string;
+};
+
 export type AskScriptureModelScripture = {
   reference: string;
   reason: string;
@@ -26,10 +34,12 @@ export type AskScriptureApiResponse = {
   requestId: string;
   safetyLevel: 'standard' | 'immediate-danger';
   answer: AskScriptureAnswerPayload;
+  entitlement?: AskEntitlement;
   usage: AskScriptureUsage;
 };
 
 export type AskScriptureUsage = {
+  entitlement?: AskEntitlement;
   limit: number;
   used: number;
   remaining: number;

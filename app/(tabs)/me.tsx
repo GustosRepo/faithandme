@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Button, Chip, Divider, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useLanguage } from '@/context/LanguageContext';
@@ -12,6 +12,7 @@ import { getAskScriptureUsage } from '@/services/ask/AskScriptureService';
 import type { AskScriptureUsage } from '@/services/ask/types';
 import { getScriptureService } from '@/services/scripture/ScriptureService';
 import type { ScriptureProvider } from '@/services/scripture/types';
+import { hasAskQuestionConsent, setAskQuestionConsent } from '@/storage/askConsent';
 import { defaultBibleActivityState, loadBibleActivityState, type BibleActivityState } from '@/storage/bibleActivity';
 import { loadJournalEntries, type JournalEntry } from '@/storage/journal';
 import { DAILY_SESSION_STAGE_ORDER } from '@/types/dailySession';
@@ -96,10 +97,17 @@ export default function MeScreen() {
   const [bibleActivity, setBibleActivity] = useState<BibleActivityState>(defaultBibleActivityState);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [askUsage, setAskUsage] = useState<AskScriptureUsage | null>(null);
+  const [askConsent, setAskConsent] = useState<boolean | null>(null);
+  const [savingAskConsent, setSavingAskConsent] = useState(false);
+  const isPlus = askUsage?.entitlement === 'plus';
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+
+      void hasAskQuestionConsent()
+        .catch(() => false)
+        .then((allowed) => { if (active) setAskConsent(allowed); });
 
       void Promise.all([
         loadBibleActivityState(),
@@ -117,6 +125,18 @@ export default function MeScreen() {
       };
     }, []),
   );
+
+  const handleAskConsent = async (allowed: boolean) => {
+    setSavingAskConsent(true);
+    try {
+      await setAskQuestionConsent(allowed);
+      setAskConsent(allowed);
+    } catch {
+      Alert.alert(t('me.askConsentFailed'));
+    } finally {
+      setSavingAskConsent(false);
+    }
+  };
 
   const handleReset = () => {
     resetOnboarding();
@@ -216,12 +236,14 @@ export default function MeScreen() {
           subtitle={t('me.weeklyReviewSubtitle')}
           onPress={() => router.push('/review/weekly')}
         />
-        <ActionRow
-          icon="star-outline"
-          title={t('me.upgradeTitle')}
-          subtitle={t('me.upgradeSubtitle')}
-          onPress={() => router.push('/upgrade')}
-        />
+        {!isPlus ? (
+          <ActionRow
+            icon="star-outline"
+            title={t('me.upgradeTitle')}
+            subtitle={t('me.upgradeSubtitle')}
+            onPress={() => router.push('/upgrade')}
+          />
+        ) : null}
       </View>
 
       <EditorialLabel>{t('me.library')}</EditorialLabel>
@@ -272,15 +294,29 @@ export default function MeScreen() {
           <Text variant="body">{t('me.appearance')}</Text>
           <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{t('me.appearanceSystem')}</Text>
         </View>
+        <Divider />
+        <View style={styles.infoRow}>
+          <View style={styles.preferenceText}>
+            <Text variant="body">{t('me.askConsent')}</Text>
+            <Text variant="caption" style={{ color: theme.colors.textSecondary }}>{t('ask.consentBody')}</Text>
+          </View>
+          <Switch
+            accessibilityLabel={t('me.askConsent')}
+            accessibilityHint={t('ask.consentBody')}
+            value={askConsent === true}
+            disabled={askConsent === null || savingAskConsent}
+            onValueChange={(allowed) => { void handleAskConsent(allowed); }}
+          />
+        </View>
       </View>
 
       <View style={[styles.upgradeBlock, { borderColor: theme.colors.wine, backgroundColor: theme.colors.surface }]}>
         <EditorialLabel style={{ color: theme.colors.wine }}>{t('me.plusTitle')}</EditorialLabel>
-        <Text variant="headingSerif">{t('me.plusHeading')}</Text>
+        <Text variant="headingSerif">{t(isPlus ? 'me.plusActive' : 'me.plusHeading')}</Text>
         <Text variant="body" style={{ color: theme.colors.textSecondary }}>
           {t('me.plusBody')}
         </Text>
-        <Button title={t('me.viewUpgrade')} variant="secondary" onPress={() => router.push('/upgrade')} />
+        {!isPlus ? <Button title={t('me.viewUpgrade')} variant="secondary" onPress={() => router.push('/upgrade')} /> : null}
       </View>
 
       {__DEV__ ? (

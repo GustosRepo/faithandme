@@ -1,12 +1,26 @@
 import { askScriptureConfig } from '@/services/ask/config';
+import { loadRecentReferences, recordCitedReferences } from '@/services/ask/askHistory';
+import { getAskClientHeaders } from '@/services/ask/askSession';
 import { retrieveRelevantScripture } from '@/services/ask/scriptureRetrieval';
-import { getOrCreateClientId } from '@/services/identity/AnonymousClientId';
 import { getScriptureService } from '@/services/scripture/ScriptureService';
 import type { ScripturePassage } from '@/services/scripture/types';
 import type { AppLanguage } from '@/context/LanguageContext';
 
-import type { AskScriptureApiResponse, AskScripturePassagePayload, AskScriptureResult, AskScriptureUsage } from './types';
+import type { AskScriptureApiResponse, AskScripturePassagePayload, AskScriptureResult, AskScriptureUsage, AskUserContext } from './types';
 import { AskScriptureError } from './types';
+
+function sanitizeContext(context: AskUserContext | undefined): AskUserContext | undefined {
+  if (!context) return undefined;
+  const goals = context.goals?.filter(Boolean).slice(0, 3);
+  const situations = context.situations?.filter(Boolean).slice(0, 3);
+  const feeling = context.feeling && context.feeling !== 'Prefer not to say' ? context.feeling : undefined;
+  if (!goals?.length && !situations?.length && !feeling) return undefined;
+  return {
+    ...(goals?.length ? { goals } : {}),
+    ...(situations?.length ? { situations } : {}),
+    ...(feeling ? { feeling } : {}),
+  };
+}
 
 function toPayload(passages: ScripturePassage[]): AskScripturePassagePayload[] {
   return passages.map((passage) => ({
@@ -58,7 +72,7 @@ function validateAndResolveResponse(
     scriptures,
     answer,
     safetyLevel: response.safetyLevel,
-    usage: response.usage,
+    usage: { ...response.usage, entitlement: response.usage.entitlement ?? response.entitlement },
   };
 }
 
@@ -67,6 +81,7 @@ function errorForCode(code: string | undefined, fallback: string) {
     case 'INVALID_REQUEST':
       return new AskScriptureError('invalid_question', 'Add a little more detail so we can find relevant Scripture.');
     case 'INVALID_CLIENT_ID':
+    case 'INVALID_SESSION':
       return new AskScriptureError('invalid_client_id', 'Ask Scripture needs to prepare this device before asking.');
     case 'DAILY_ASK_LIMIT':
       return new AskScriptureError('daily_ask_limit', "You've used today's free questions. Come back tomorrow for more.");
@@ -95,20 +110,27 @@ async function parseError(response: Response, fallback: string) {
   }
 }
 
-export async function getAskScriptureUsage(): Promise<AskScriptureUsage> {
+async function fetchAskScriptureUsage(refreshEntitlement: boolean): Promise<AskScriptureUsage> {
   if (!askScriptureConfig.apiBaseUrl) {
     throw new AskScriptureError('missing_api_url', 'Ask Scripture needs a Faith & Me API URL before it can respond.');
   }
 
-  const clientId = await getOrCreateClientId();
+  const headers = await getAskClientHeaders();
+  const endpoint = refreshEntitlement ? 'entitlement' : 'usage';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
 
   let response: Response;
   try {
-    response = await fetch(`${askScriptureConfig.apiBaseUrl}/api/ask-scripture/usage`, {
-      headers: { 'X-Faith-Client-Id': clientId },
+    response = await fetch(`${askScriptureConfig.apiBaseUrl}/api/ask-scripture/${endpoint}`, {
+      method: refreshEntitlement ? 'POST' : 'GET',
+      headers,
+      signal: controller.signal,
     });
   } catch {
     throw new AskScriptureError('network', "Ask Scripture couldn't connect right now.");
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (!response.ok) {
@@ -118,30 +140,48 @@ export async function getAskScriptureUsage(): Promise<AskScriptureUsage> {
   return response.json() as Promise<AskScriptureUsage>;
 }
 
-export async function askScripture(question: string, language: AppLanguage = 'en'): Promise<AskScriptureResult> {
+export function getAskScriptureUsage() {
+  return fetchAskScriptureUsage(false);
+}
+
+export function refreshAskScriptureEntitlement() {
+  return fetchAskScriptureUsage(true);
+}
+
+export async function askScripture(
+  question: string,
+  language: AppLanguage = 'en',
+  options: { personalization?: { consent: true; context: AskUserContext } } = {},
+): Promise<AskScriptureResult> {
   const trimmedQuestion = validateQuestion(question);
 
   if (!askScriptureConfig.apiBaseUrl) {
     throw new AskScriptureError('missing_api_url', 'Ask Scripture needs a Faith & Me API URL before it can respond.');
   }
 
-  const retrievedPassages = retrieveRelevantScripture(trimmedQuestion, askScriptureConfig.maxPassages, language);
+  const recentReferences = await loadRecentReferences();
+  const retrievedPassages = retrieveRelevantScripture(trimmedQuestion, askScriptureConfig.maxPassages, language, {
+    excludeReferences: recentReferences,
+    maxTotalTextLength: askScriptureConfig.maxTotalPassageTextLength,
+  });
 
   if (!retrievedPassages.length) {
     throw new AskScriptureError('server', 'Something went wrong while preparing your response.');
   }
 
   let response: Response;
-  const clientId = await getOrCreateClientId();
+  const headers = await getAskClientHeaders();
+  const context = options.personalization?.consent ? sanitizeContext(options.personalization.context) : undefined;
 
   try {
     response = await fetch(`${askScriptureConfig.apiBaseUrl}/api/ask-scripture`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Faith-Client-Id': clientId },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({
         question: trimmedQuestion,
         language,
         passages: toPayload(retrievedPassages),
+        ...(context ? { context, personalizationConsent: true } : {}),
       }),
     });
   } catch {
@@ -157,5 +197,7 @@ export async function askScripture(question: string, language: AppLanguage = 'en
   }
 
   const data = await response.json() as AskScriptureApiResponse;
-  return validateAndResolveResponse(data, retrievedPassages, trimmedQuestion, language);
+  const result = validateAndResolveResponse(data, retrievedPassages, trimmedQuestion, language);
+  void recordCitedReferences(result.scriptures.map((scripture) => scripture.reference));
+  return result;
 }

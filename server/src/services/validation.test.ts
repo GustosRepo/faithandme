@@ -4,13 +4,13 @@ import test from 'node:test';
 import { sanitizeModelResponse, validateTotalPassageTextLength } from './validation.js';
 
 test('validateTotalPassageTextLength rejects oversized scripture context', () => {
-  assert.equal(validateTotalPassageTextLength({
-    question: 'Why am I anxious about everything?',
-    language: 'en',
-    passages: [
-      { reference: 'PHP.4.6-7', displayReference: 'Philippians 4:6-7', text: 'x'.repeat(3601) },
-    ],
-  }), false);
+  assert.equal(validateTotalPassageTextLength([
+    { text: 'x'.repeat(6001) },
+  ]), false);
+  assert.equal(validateTotalPassageTextLength([
+    { text: 'x'.repeat(3000) },
+    { text: 'y'.repeat(2999) },
+  ]), true);
 });
 
 test('sanitizeModelResponse removes references not supplied by the client', () => {

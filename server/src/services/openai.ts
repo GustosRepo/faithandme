@@ -1,7 +1,9 @@
 import OpenAI from 'openai';
 
 import { serverConfig } from '../config.js';
-import type { AskScriptureRequest, ModelAskScriptureResponse } from '../schemas/askScripture.js';
+import type { AskContext, ModelAskScriptureResponse } from '../schemas/askScripture.js';
+import type { AskEntitlement } from './askPolicy.js';
+import type { CanonicalPassage } from './bible.js';
 import { sanitizeModelResponse } from './validation.js';
 import { safetyInstructionFor, type SafetyLevel } from './safety.js';
 
@@ -9,6 +11,15 @@ export type OpenAiTokenUsage = {
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
+};
+
+export type AskModelInput = {
+  question: string;
+  language: 'en' | 'es';
+  passages: CanonicalPassage[];
+  context?: AskContext;
+  safetyLevel: SafetyLevel;
+  entitlement: AskEntitlement;
 };
 
 function buildResponseSchema(allowedReferences: string[]) {
@@ -58,15 +69,17 @@ function getClient() {
   return client;
 }
 
-function buildPrompt(request: AskScriptureRequest, safetyLevel: SafetyLevel) {
-  const passages = request.passages.map((passage) => ({
+function buildPrompt(input: AskModelInput) {
+  const passages = input.passages.map((passage) => ({
     reference: passage.reference,
     displayReference: passage.displayReference,
     text: passage.text,
   }));
-  const responseLanguageInstruction = request.language === 'es'
+  const responseLanguageInstruction = input.language === 'es'
     ? 'Write every user-facing field in natural, warm Latin American Spanish. Keep Scripture reference ids unchanged. Do not translate or quote Scripture text; the app displays canonical Bible text locally.'
     : 'Write every user-facing field in natural, warm English.';
+
+  const hasContext = Boolean(input.context && (input.context.feeling || input.context.goals?.length || input.context.situations?.length));
 
   return [
     {
@@ -74,45 +87,52 @@ function buildPrompt(request: AskScriptureRequest, safetyLevel: SafetyLevel) {
       content: [
         'You help explain and apply Scripture supplied in the request.',
         'Use only the supplied passages as authoritative quoted Scripture for this response.',
-        `Do not invent Bible quotations or introduce new Scripture references. Scripture reference values must exactly match one of: ${request.passages.map((passage) => passage.reference).join(', ')}.`,
+        `Do not invent Bible quotations or introduce new Scripture references. Scripture reference values must exactly match one of: ${input.passages.map((passage) => passage.reference).join(', ')}.`,
+        'Choose only the passages that best fit this specific question; you do not need to use every supplied passage.',
         'Do not return Scripture text. Return references and reasons only; the app resolves canonical BSB text locally.',
         'Do not claim God directly told the user something or claim knowledge of God’s specific plan.',
         'Distinguish Scripture from explanation and application.',
         'When interpretations vary among Christian traditions, avoid presenting one contested interpretation as universal.',
         'Keep the response compassionate, concise, and practical.',
+        hasContext ? 'The request may include userContext the person shared during onboarding (how they feel, their situations, their goals). Use it to make the application and next step feel personal, but never repeat it back verbatim or make assumptions beyond it.' : '',
         responseLanguageInstruction,
         'Set safetyNote to an empty string unless immediate real-world safety guidance is needed.',
-        safetyInstructionFor(safetyLevel),
+        safetyInstructionFor(input.safetyLevel),
       ].filter(Boolean).join(' '),
     },
     {
       role: 'user' as const,
       content: JSON.stringify({
-        question: request.question,
-        responseLanguage: request.language,
+        question: input.question,
+        responseLanguage: input.language,
+        ...(hasContext ? { userContext: input.context } : {}),
         suppliedPassages: passages,
       }),
     },
   ];
 }
 
+export function getReasoningEffortFor(entitlement: AskEntitlement) {
+  return entitlement === 'plus' ? serverConfig.openAiPlusReasoningEffort : serverConfig.openAiReasoningEffort;
+}
+
 export async function createAskScriptureResponse(
-  request: AskScriptureRequest,
-  safetyLevel: SafetyLevel,
+  input: AskModelInput,
 ): Promise<{ answer: ModelAskScriptureResponse; tokenUsage: OpenAiTokenUsage }> {
   const response = await getClient().responses.create({
     model: serverConfig.openAiModel,
-    input: buildPrompt(request, safetyLevel),
+    input: buildPrompt(input),
+    store: false,
     max_output_tokens: serverConfig.limits.maxOutputTokens,
     reasoning: {
-      effort: serverConfig.openAiReasoningEffort,
+      effort: getReasoningEffortFor(input.entitlement),
     },
     text: {
       format: {
         type: 'json_schema',
         name: 'faith_and_me_ask_scripture_response',
         strict: true,
-        schema: buildResponseSchema(request.passages.map((passage) => passage.reference)),
+        schema: buildResponseSchema(input.passages.map((passage) => passage.reference)),
       },
     },
   });
@@ -124,7 +144,7 @@ export async function createAskScriptureResponse(
 
   const parsed = JSON.parse(rawText) as unknown;
   return {
-    answer: sanitizeModelResponse(parsed, request.passages.map((passage) => passage.reference)),
+    answer: sanitizeModelResponse(parsed, input.passages.map((passage) => passage.reference)),
     tokenUsage: {
       inputTokens: response.usage?.input_tokens,
       outputTokens: response.usage?.output_tokens,

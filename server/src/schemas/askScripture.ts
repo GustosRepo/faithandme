@@ -4,14 +4,24 @@ import { serverConfig } from '../config.js';
 
 export const passageSchema = z.strictObject({
   reference: z.string().trim().regex(/^[1-3]?[A-Z]{2,3}\.\d+\.\d+(?:-\d+)?$/),
-  displayReference: z.string().trim().min(3).max(80),
-  text: z.string().trim().min(1).max(serverConfig.limits.maxPassageTextLength),
+  // Legacy fields: accepted for backwards compatibility but ignored. The server
+  // resolves canonical passage text from the reference and never trusts client text.
+  displayReference: z.string().trim().min(3).max(80).optional(),
+  text: z.string().trim().min(1).max(serverConfig.limits.maxPassageTextLength).optional(),
+});
+
+export const askContextSchema = z.strictObject({
+  goals: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
+  situations: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
+  feeling: z.string().trim().min(1).max(40).optional(),
 });
 
 export const askScriptureRequestSchema = z.strictObject({
   question: z.string().trim().min(serverConfig.limits.questionMinLength).max(serverConfig.limits.questionMaxLength),
   language: z.enum(['en', 'es']).default('en'),
-  passages: z.array(passageSchema).min(1).max(serverConfig.limits.maxPassages),
+  passages: z.array(passageSchema).min(1).max(serverConfig.limits.maxRequestPassages),
+  context: askContextSchema.optional(),
+  personalizationConsent: z.boolean().optional(),
 });
 
 export const modelScriptureSchema = z.strictObject({
@@ -31,4 +41,5 @@ export const modelResponseSchema = z.strictObject({
 });
 
 export type AskScriptureRequest = z.infer<typeof askScriptureRequestSchema>;
+export type AskContext = z.infer<typeof askContextSchema>;
 export type ModelAskScriptureResponse = z.infer<typeof modelResponseSchema>;

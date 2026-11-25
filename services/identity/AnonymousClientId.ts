@@ -29,7 +29,7 @@ export function isValidAnonymousClientId(value: string | null | undefined) {
   return Boolean(value && uuidPattern.test(value));
 }
 
-export async function getOrCreateClientId() {
+async function loadOrCreateClientId() {
   const available = await SecureStore.isAvailableAsync();
   if (!available) {
     throw new Error('Secure storage is unavailable.');
@@ -43,4 +43,14 @@ export async function getOrCreateClientId() {
   const nextId = generateUuid().toLowerCase();
   await SecureStore.setItemAsync(clientIdKey, nextId);
   return nextId;
+}
+
+let clientIdRequest: Promise<string> | undefined;
+
+export function getOrCreateClientId() {
+  clientIdRequest ??= loadOrCreateClientId().catch((error: unknown) => {
+    clientIdRequest = undefined;
+    throw error;
+  });
+  return clientIdRequest;
 }

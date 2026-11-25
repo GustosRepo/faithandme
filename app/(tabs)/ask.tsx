@@ -1,16 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Keyboard, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { BrandMark } from '@/components/BrandMark';
 import { Button, Chip, Divider, EditorialLabel, Screen, Text } from '@/components/ui';
 import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
+import { useOnboarding } from '@/context/OnboardingContext';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { askScripture, getAskScriptureUsage } from '@/services/ask/AskScriptureService';
 import { getAskTopicLabels } from '@/services/ask/scriptureRetrieval';
 import type { AskScriptureErrorCode, AskScriptureResult, AskScriptureUsage } from '@/services/ask/types';
 import { AskScriptureError } from '@/services/ask/types';
+import { hasAskQuestionConsent, setAskQuestionConsent } from '@/storage/askConsent';
 import { addJournalEntry } from '@/storage/journal';
 
 const MAX_QUESTION_LENGTH = 800;
@@ -101,6 +103,7 @@ export default function AskScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const { language, t } = useLanguage();
+  const { state: onboardingState } = useOnboarding();
   const topics = getAskTopicLabels();
   const inputRef = useRef<TextInput>(null);
   const [question, setQuestion] = useState('');
@@ -112,25 +115,29 @@ export default function AskScreen() {
   const [usage, setUsage] = useState<AskScriptureUsage | null>(null);
   const [savingToJournal, setSavingToJournal] = useState(false);
   const [savedToJournal, setSavedToJournal] = useState(false);
+  const [personalize, setPersonalize] = useState(false);
+  const usageVersion = useRef(0);
+  const submitInProgress = useRef(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
+    const version = ++usageVersion.current;
 
     void getAskScriptureUsage()
       .then((nextUsage) => {
-        if (!cancelled) setUsage(nextUsage);
+        if (!cancelled && version === usageVersion.current) setUsage(nextUsage);
       })
       .catch((caught) => {
         if (__DEV__) {
           console.warn('Ask Scripture usage unavailable', caught);
         }
-        if (!cancelled) setUsage(null);
+        if (!cancelled && version === usageVersion.current) setUsage(null);
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, []));
 
   useEffect(() => {
     if (!loading) return;
@@ -141,16 +148,47 @@ export default function AskScreen() {
   }, [loading, t]);
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || submitInProgress.current) return;
+    submitInProgress.current = true;
+    try {
+      const hasConsent = await hasAskQuestionConsent().catch(() => false);
+      if (!hasConsent) {
+        Keyboard.dismiss();
+        const allowed = await new Promise<boolean>((resolve) => {
+          Alert.alert(t('ask.consentTitle'), t('ask.consentBody'), [
+            { text: t('ask.consentDecline'), style: 'cancel', onPress: () => resolve(false) },
+            { text: t('ask.consentAllow'), onPress: () => resolve(true) },
+          ], { cancelable: false });
+        });
+        if (!allowed) return;
+        await setAskQuestionConsent(true).catch(() => undefined);
+      }
+      await submitQuestion();
+    } finally {
+      submitInProgress.current = false;
+    }
+  };
 
+  const submitQuestion = async () => {
     Keyboard.dismiss();
+    usageVersion.current += 1;
     setError(null);
     setResult(null);
     setSavedToJournal(false);
     setLoading(true);
+    setPersonalize(false);
 
     try {
-      const answer = await askScripture(question, language);
+      const answer = await askScripture(question, language, {
+        personalization: personalize ? {
+          consent: true,
+          context: {
+            goals: onboardingState.goals,
+            situations: onboardingState.situations.filter((situation) => situation !== 'Nothing specific right now'),
+            feeling: onboardingState.currentFeeling ?? undefined,
+          },
+        } : undefined,
+      });
       setResult(answer);
       setQuestion('');
       setUsage(answer.usage);
@@ -224,6 +262,7 @@ export default function AskScreen() {
   };
 
   const exhausted = usage ? usage.remaining <= 0 : false;
+  const isPlusMember = usage?.entitlement === 'plus';
   const normalizedQuestion = question.trim().replace(/\s+/g, ' ');
   const hasMeaningfulContent = normalizedQuestion.length >= 8 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(normalizedQuestion);
   const canSubmit = hasMeaningfulContent && !loading && !exhausted && !result;
@@ -263,7 +302,7 @@ export default function AskScreen() {
             <View style={[styles.notice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surface }]}>
               <Text variant="subheading">{t('ask.exhaustedTitle')}</Text>
               <Text variant="bodySmall" style={{ color: theme.colors.textSecondary }}>{t('ask.exhaustedBody')}</Text>
-              <Button title={t('ask.viewUpgrade')} variant="secondary" onPress={() => router.push('/upgrade')} />
+              {!isPlusMember ? <Button title={t('ask.viewUpgrade')} variant="secondary" onPress={() => router.push('/upgrade')} /> : null}
             </View>
           ) : null}
 
@@ -316,6 +355,22 @@ export default function AskScreen() {
             </View>
           </View>
 
+          {!exhausted ? (
+            <View style={styles.personalization}>
+              <View style={styles.personalizationCopy}>
+                <Text variant="bodySmall">{t('ask.personalize')}</Text>
+                <Text variant="caption" style={{ color: theme.colors.textSecondary }}>{t('ask.personalizeDetail')}</Text>
+              </View>
+              <Switch
+                accessibilityLabel={t('ask.personalize')}
+                accessibilityHint={t('ask.personalizeDetail')}
+                disabled={loading}
+                value={personalize}
+                onValueChange={setPersonalize}
+              />
+            </View>
+          ) : null}
+
           <View style={styles.suggestionsBlock}>
             <Text variant="caption" style={{ color: theme.colors.textMuted }}>
               {t('ask.peopleAsk')}
@@ -339,7 +394,7 @@ export default function AskScreen() {
                     <Button title={t('ask.todaysMoment')} variant="ghost" onPress={() => router.push('/(tabs)')} />
                   </>
                 ) : null}
-                {error?.code === 'daily_ask_limit' ? <Button title={t('ask.viewUpgrade')} variant="ghost" onPress={() => router.push('/upgrade')} /> : null}
+                {error?.code === 'daily_ask_limit' && !isPlusMember ? <Button title={t('ask.viewUpgrade')} variant="ghost" onPress={() => router.push('/upgrade')} /> : null}
               </View>
             </View>
           ) : null}
@@ -454,6 +509,15 @@ export default function AskScreen() {
 }
 
 const styles = StyleSheet.create({
+  personalization: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  personalizationCopy: {
+    flex: 1,
+    gap: 4,
+  },
   container: {
     gap: 16,
     paddingBottom: 92,
